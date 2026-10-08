@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createApp } from './app.ts';
 import { Store } from './store.ts';
-import { Engine, type Channel } from './engine.ts';
+import { Engine, type Channel, type Probe } from './engine.ts';
 import { encrypt, publicAddress } from './network.ts';
 import type { TelemetryStore } from './store.ts';
 import { dashboard } from './queries.ts';
@@ -471,5 +471,31 @@ test('latest probe recovery is healthy, older failed sample does not override it
   ]);
   const d = await dashboard(store, { workspace: 'live', from: now - 10000, to: now });
   assert.equal(d.services[0].status, 'healthy');
+  store.close();
+});
+test('synthetic response time is a probe duration, not a request percentile', async () => {
+  const store = new Store(':memory:'),
+    engine = new Engine(store, key, async () => ({ status: 503, durationMs: 321 }));
+  const probe: Probe = {
+    id: 'probe',
+    workspace: 'live',
+    name: 'check',
+    service: 'orders',
+    environment: 'production',
+    url: 'https://example.com',
+    enabled: true,
+    lastRun: null,
+    lastStatus: null,
+    lastError: null,
+    lastDurationMs: null,
+  };
+  store.put('probe', probe);
+  await engine.probes(now);
+  const rows = store.query('metric', { workspace: 'live', from: now, to: now }).items;
+  assert.ok(
+    rows.some((m) => m.kind === 'metric' && m.name === 'probe_duration_ms' && m.value === 321),
+  );
+  assert.ok(!rows.some((m) => m.kind === 'metric' && m.name === 'latency_p95_ms'));
+  assert.equal(store.get<Probe>('probe', 'probe', 'live')?.lastStatus, 503);
   store.close();
 });

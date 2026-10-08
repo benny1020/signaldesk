@@ -20,6 +20,7 @@ export type Probe = {
   enabled: boolean;
   lastRun: number | null;
   lastStatus: number | null;
+  lastDurationMs: number | null;
   lastError: string | null;
 };
 export type Sender = (
@@ -179,10 +180,12 @@ export class Engine {
       .slice(0, 10)) {
       let up = 0,
         duration = 0;
+      probe.lastDurationMs = null;
       try {
         const result = await this.send(probe.url);
         probe.lastStatus = result.status;
         duration = result.durationMs;
+        probe.lastDurationMs = duration;
         up = result.status >= 200 && result.status < 300 ? 1 : 0;
         probe.lastError = null;
       } catch (e) {
@@ -200,14 +203,14 @@ export class Engine {
           name: 'probe_up',
           value: up,
         },
-        ...(up
+        ...(probe.lastDurationMs !== null
           ? [
               {
                 kind: 'metric' as const,
                 timestamp: now,
                 service: probe.service,
                 environment: probe.environment,
-                name: 'latency_p95_ms' as const,
+                name: 'probe_duration_ms' as const,
                 value: duration,
               },
             ]

@@ -54,7 +54,7 @@ Common fields: optional stable `id` (max 128), `timestamp`, nonempty `service`, 
 }
 ```
 
-Metric names: `request_rate` (req/s), `error_pct` (%), `latency_p95_ms` (ms), `cpu_pct` (%), `memory_pct` (%), `probe_up` (0/1), `ai_cost_usd` (USD measurement supplied by producer). Values are finite/nonnegative; percentages are ≤100. Include `host` for host resource metrics. Rates and percentiles are producer-calculated gauges, not raw counters or histograms. Do not send a cumulative count under `request_rate`.
+Metric names: `request_rate` (req/s), `error_pct` (%), `latency_p95_ms` (ms), `cpu_pct` (%), `memory_pct` (%), `probe_up` (0/1), `probe_duration_ms` (one synthetic request duration, not p95), `ai_cost_usd` (USD measurement supplied by producer). Values are finite/nonnegative; percentages are ≤100. Include `host` for host resource metrics. Rates and percentiles are producer-calculated gauges, not raw counters or histograms. Do not send a cumulative count under `request_rate`.
 
 ```json
 {

@@ -680,6 +680,7 @@ export type Connections = {
     enabled: boolean;
     lastRun: number | null;
     lastStatus: number | null;
+    lastDurationMs: number | null;
     lastError: string | null;
   }[];
   deliveries: {
@@ -1137,6 +1138,7 @@ export function ConnectionsPage(p: PageProps) {
                 <th>검사</th>
                 <th>서비스</th>
                 <th>최근 응답</th>
+                <th>검사 소요</th>
                 <th>실행 시각</th>
                 <th>오류</th>
                 <th />
@@ -1151,6 +1153,7 @@ export function ConnectionsPage(p: PageProps) {
                   </td>
                   <td>{v.service}</td>
                   <td>{v.lastStatus ?? '—'}</td>
+                  <td>{v.lastDurationMs == null ? '—' : number(v.lastDurationMs, 0) + ' ms'}</td>
                   <td>{v.lastRun ? time(v.lastRun) : '대기'}</td>
                   <td>{v.lastError ?? '—'}</td>
                   <td>

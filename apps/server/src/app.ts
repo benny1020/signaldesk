@@ -524,6 +524,7 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
       enabled: true,
       lastRun: null,
       lastStatus: null,
+      lastDurationMs: null,
       lastError: null,
     };
     store.put('probe', p);

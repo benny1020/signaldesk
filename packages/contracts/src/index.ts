@@ -8,6 +8,7 @@ export const metricNames = [
   'cpu_pct',
   'memory_pct',
   'probe_up',
+  'probe_duration_ms',
   'ai_cost_usd',
 ] as const;
 const base = {
