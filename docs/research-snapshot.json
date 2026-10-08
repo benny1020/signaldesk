@@ -1,0 +1,158 @@
+{
+  "monitoringRepositories": [
+    {
+      "full_name": "OneUptime/oneuptime",
+      "html_url": "https://github.com/OneUptime/oneuptime",
+      "sha": "69b2affebb4256b258f169bb93474756da588287",
+      "checked_at": "2026-10-08T15:18:57.138973+00:00",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      }
+    },
+    {
+      "full_name": "SigNoz/signoz",
+      "html_url": "https://github.com/SigNoz/signoz",
+      "sha": "04db70bade0437f0049d06e2ba78ec76cf13ccbd",
+      "checked_at": "2026-10-08T15:18:57.053896+00:00",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      }
+    },
+    {
+      "full_name": "getsentry/sentry",
+      "html_url": "https://github.com/getsentry/sentry",
+      "sha": "211c80cfab023893c13f952c1ddfe05ea76f8769",
+      "checked_at": "2026-10-08T15:18:59.352640+00:00",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      }
+    },
+    {
+      "full_name": "grafana/grafana",
+      "html_url": "https://github.com/grafana/grafana",
+      "sha": "df1ebd0b7d20ecac68a497058edfdaa0e04e6821",
+      "checked_at": "2026-10-08T15:18:57.038908+00:00",
+      "license": {
+        "key": "agpl-3.0",
+        "name": "GNU Affero General Public License v3.0",
+        "spdx_id": "AGPL-3.0",
+        "url": "https://api.github.com/licenses/agpl-3.0",
+        "node_id": "MDc6TGljZW5zZTE="
+      }
+    },
+    {
+      "full_name": "healthchecks/healthchecks",
+      "html_url": "https://github.com/healthchecks/healthchecks",
+      "sha": "e623fa3b3a5e6c3dbcb92d0598a1f15d8e2e92ba",
+      "checked_at": "2026-10-08T15:18:58.932257+00:00",
+      "license": {
+        "key": "bsd-3-clause",
+        "name": "BSD 3-Clause \"New\" or \"Revised\" License",
+        "spdx_id": "BSD-3-Clause",
+        "url": "https://api.github.com/licenses/bsd-3-clause",
+        "node_id": "MDc6TGljZW5zZTU="
+      }
+    },
+    {
+      "full_name": "keephq/keep",
+      "html_url": "https://github.com/keephq/keep",
+      "sha": "465e99152e7586fcbe4c2732213d31c5c28def4b",
+      "checked_at": "2026-10-08T15:18:57.031914+00:00",
+      "license": {
+        "key": "other",
+        "name": "Other",
+        "spdx_id": "NOASSERTION",
+        "url": null,
+        "node_id": "MDc6TGljZW5zZTA="
+      }
+    },
+    {
+      "full_name": "louislam/uptime-kuma",
+      "html_url": "https://github.com/louislam/uptime-kuma",
+      "sha": "0d9728993df67b50505aeb0aff89dfd27b96fa06",
+      "checked_at": "2026-10-08T15:18:57.024061+00:00",
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      }
+    },
+    {
+      "full_name": "netdata/netdata",
+      "html_url": "https://github.com/netdata/netdata",
+      "sha": "741510d406707e06f6ec43a3baa779094de292c3",
+      "checked_at": "2026-10-08T15:18:58.260376+00:00",
+      "license": {
+        "key": "gpl-3.0",
+        "name": "GNU General Public License v3.0",
+        "spdx_id": "GPL-3.0",
+        "url": "https://api.github.com/licenses/gpl-3.0",
+        "node_id": "MDc6TGljZW5zZTk="
+      }
+    },
+    {
+      "full_name": "openobserve/openobserve",
+      "html_url": "https://github.com/openobserve/openobserve",
+      "sha": "b0998904578d9c3adb2da013a9f5a5895af768fe",
+      "checked_at": "2026-10-08T15:18:57.121599+00:00",
+      "license": {
+        "key": "agpl-3.0",
+        "name": "GNU Affero General Public License v3.0",
+        "spdx_id": "AGPL-3.0",
+        "url": "https://api.github.com/licenses/agpl-3.0",
+        "node_id": "MDc6TGljZW5zZTE="
+      }
+    },
+    {
+      "full_name": "prometheus/alertmanager",
+      "html_url": "https://github.com/prometheus/alertmanager",
+      "sha": "1c97e5518aa98029b9dbfd3ca06ce5a56286aa41",
+      "checked_at": "2026-10-08T15:18:58.600258+00:00",
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      }
+    },
+    {
+      "full_name": "zabbix/zabbix",
+      "html_url": "https://github.com/zabbix/zabbix",
+      "sha": "154886c2523cf9f9f7d5299a79734622afe8c2f8",
+      "checked_at": "2026-10-08T15:18:58.509532+00:00",
+      "license": {
+        "key": "agpl-3.0",
+        "name": "GNU Affero General Public License v3.0",
+        "spdx_id": "AGPL-3.0",
+        "url": "https://api.github.com/licenses/agpl-3.0",
+        "node_id": "MDc6TGljZW5zZTE="
+      }
+    }
+  ],
+  "visualization": {
+    "echarts": "6.1.0",
+    "tanstackVirtual": "3.14.13"
+  },
+  "aiPrimarySources": [
+    "https://github.com/langfuse/langfuse",
+    "https://github.com/comet-ml/opik",
+    "https://github.com/Arize-ai/phoenix",
+    "https://github.com/open-telemetry/semantic-conventions-genai"
+  ],
+  "notes": "GitHub license detection is metadata only. README and LICENSE files were checked to distinguish enterprise and source-available boundaries. AI sources were rechecked on 2026-10-09."
+}

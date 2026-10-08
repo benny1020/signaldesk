@@ -1,0 +1,45 @@
+{
+  "name": "signaldesk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently -k -n api,web 'node --env-file-if-exists=.env --import tsx --watch apps/server/src/main.ts' 'vite --config apps/web/vite.config.ts'",
+    "start": "node --env-file-if-exists=.env --import tsx apps/server/src/main.ts",
+    "build": "tsc --noEmit && vite build --config apps/web/vite.config.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test apps/server/src/*.test.ts",
+    "check": "npm run format:check && npm run typecheck && npm test && npm run build",
+    "demo:reset": "tsx scripts/reset-demo.ts",
+    "credentials": "tsx scripts/credentials.ts",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "11.2.1",
+    "@fastify/static": "10.1.5",
+    "@fontsource-variable/manrope": "5.3.0",
+    "@tanstack/react-query": "5.104.1",
+    "@tanstack/react-virtual": "3.14.13",
+    "echarts": "6.1.0",
+    "fastify": "5.12.5",
+    "lucide-react": "1.53.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "tsx": "4.23.15",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.1.2",
+    "concurrently": "10.0.6",
+    "prettier": "3.9.9",
+    "typescript": "7.0.2",
+    "vite": "8.3.4"
+  }
+}

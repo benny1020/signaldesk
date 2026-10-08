@@ -1,0 +1,20 @@
+services:
+  signaldesk:
+    build: .
+    ports:
+      - '127.0.0.1:4320:4319'
+    environment:
+      AUTH_MODE: token
+      ACCESS_TOKENS: ${ACCESS_TOKENS:?Generate credentials and set ACCESS_TOKENS in .env}
+      CHANNEL_KEY: ${CHANNEL_KEY:?Set CHANNEL_KEY in .env}
+      MAX_EVENTS: ${MAX_EVENTS:-1000000}
+      ALLOWED_DESTINATION_HOSTS: ${ALLOWED_DESTINATION_HOSTS:-}
+    volumes:
+      - signaldesk-data:/app/data
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  signaldesk-data:
