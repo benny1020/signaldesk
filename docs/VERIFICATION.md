@@ -2,23 +2,23 @@
 
 Executed 2026-10-09. This record distinguishes observed acceptance from future production guarantees.
 
-| Check                                      | Observed result                                                                                                                                                                      |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Formatting / TypeScript / production build | Passed locally with Node 26.4.0; dependency versions fixed in lockfile                                                                                                               |
-| Automated integration suite                | 16 tests passed: ingestion, privacy, auth/scope, duration/no-data/recovery, outbox, cursor, persistence, async adapter, exact trace, OTLP JSON and producer queue                    |
-| Dependency audit                           | 0 reported vulnerabilities at verification time                                                                                                                                      |
-| Browser errors                             | Numeric-view switching exposed a React/ECharts DOM reuse issue. Distinct container keys fixed it; repeated graph/table switching in a fresh tab produced no error/warning entries.   |
-| Correlated navigation                      | Overview → checkout service → scoped logs → exact trace; 4 spans and DB failure waterfall observed                                                                                   |
-| Alert actions                              | Acknowledgment persisted independently of firing state; 30-minute snooze exposed its own expiry                                                                                      |
-| Rule                                       | Preview showed 96 samples / 26 threshold violations; create reflected in rules table                                                                                                 |
-| Incident                                   | Investigation note and status change reflected in persisted timeline                                                                                                                 |
-| Live ingestion                             | Sample producer accepted 5 server/API events and 1 AI span; missing AI cost remained null                                                                                            |
-| Real local signals                         | Local host appeared with actual measurements; self-instrumented API spans appeared in Live                                                                                           |
-| Mobile                                     | 390×844 viewport rendered dashboard with no document horizontal overflow; charts and pause/resume worked; viewport override reset                                                    |
-| Outbound HTTPS                             | Read-only request to example.com returned 200 using the pinned DNS sender; no real webhook destination was configured                                                                |
-| Container build                            | Node 24 official image build passed; Docker Desktop credential helper initially hung, recovered with task-scoped anonymous public-registry configuration                             |
-| Container runtime / restart                | Passed with Node v24.21.0: unauthorized read denied, six demo services, Live alert fired/recovered, incident note survived restart. Temporary container/volume removed.              |
-| GitHub CI                                  | [Implementation CI](https://github.com/benny1020/signaldesk/actions/runs/37808761107) passed verify and container jobs; final metric-semantics update is revalidated in the next run |
+| Check                                      | Observed result                                                                                                                                                                    |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Formatting / TypeScript / production build | Passed locally with Node 26.4.0; dependency versions fixed in lockfile                                                                                                             |
+| Automated integration suite                | 16 tests passed: ingestion, privacy, auth/scope, duration/no-data/recovery, outbox, cursor, persistence, async adapter, exact trace, OTLP JSON and producer queue                  |
+| Dependency audit                           | 0 reported vulnerabilities at verification time                                                                                                                                    |
+| Browser errors                             | Numeric-view switching exposed a React/ECharts DOM reuse issue. Distinct container keys fixed it; repeated graph/table switching in a fresh tab produced no error/warning entries. |
+| Correlated navigation                      | Overview → checkout service → scoped logs → exact trace; 4 spans and DB failure waterfall observed                                                                                 |
+| Alert actions                              | Acknowledgment persisted independently of firing state; 30-minute snooze exposed its own expiry                                                                                    |
+| Rule                                       | Preview showed 96 samples / 26 threshold violations; create reflected in rules table                                                                                               |
+| Incident                                   | Investigation note and status change reflected in persisted timeline                                                                                                               |
+| Live ingestion                             | Sample producer accepted 5 server/API events and 1 AI span; missing AI cost remained null                                                                                          |
+| Real local signals                         | Local host appeared with actual measurements; self-instrumented API spans appeared in Live                                                                                         |
+| Mobile                                     | 390×844 viewport rendered dashboard with no document horizontal overflow; charts and pause/resume worked; viewport override reset                                                  |
+| Outbound HTTPS                             | Read-only request to example.com returned 200 using the pinned DNS sender; no real webhook destination was configured                                                              |
+| Container build                            | Node 24 official image build passed; Docker Desktop credential helper initially hung, recovered with task-scoped anonymous public-registry configuration                           |
+| Container runtime / restart                | Passed with Node v24.21.0: unauthorized read denied, six demo services, Live alert fired/recovered, incident note survived restart. Temporary container/volume removed.            |
+| GitHub CI                                  | [Implementation CI](https://github.com/benny1020/signaldesk/actions/runs/37809435582) passed verify and container jobs at `fbf51fa`, including the synthetic duration regression   |
 
 ## Local bounded query measurement
 
