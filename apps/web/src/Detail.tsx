@@ -57,6 +57,12 @@ export function Detail({
       ? {
           service: selection.service ?? p.params.service,
           environment: selection.environment ?? p.params.environment,
+          ...Object.fromEntries(
+            ['module', 'region', 'zone', 'cluster', 'namespace', 'instanceId'].map((key) => [
+              key,
+              selection[key as keyof typeof selection] ?? p.params[key],
+            ]),
+          ),
         }
       : {}),
   };
@@ -110,6 +116,18 @@ export function Detail({
           <dl className="detail-list">
             <dt>환경</dt>
             <dd>{selection.log.environment}</dd>
+            {Object.entries({
+              모듈: selection.log.module,
+              리전: selection.log.region,
+              클러스터: selection.log.cluster,
+              네임스페이스: selection.log.namespace,
+              인스턴스: selection.log.instanceId,
+            }).map(([label, value]) => (
+              <div className="detail-pair" key={label}>
+                <dt>{label}</dt>
+                <dd>{value ?? '미지정'}</dd>
+              </div>
+            ))}
             <dt>로그 ID</dt>
             <dd className="mono">{selection.log.id}</dd>
             {Object.entries(selection.log.attributes).map(([k, v]) => (
@@ -153,11 +171,17 @@ export function Detail({
                 >
                   <Copy size={15} />
                 </button>
-                <span>{trace.data.items.length}개 스팬</span>
+                <span>
+                  {trace.data.items.length}개 스팬 ·{' '}
+                  {new Set(trace.data.items.map((s) => s.region ?? 'unknown')).size}개 리전
+                </span>
               </div>
               {trace.data.truncated && (
                 <div className="notice">일부 스팬만 표시됩니다. 시간 범위를 좁히세요.</div>
               )}
+              <p className="muted">
+                트레이스는 현재 환경·시간 내 연결된 다른 리전과 모듈의 스팬을 함께 표시합니다.
+              </p>
               <TraceWaterfall
                 spans={trace.data.items}
                 onService={(name) => p.select({ type: 'service', name })}
@@ -193,6 +217,10 @@ export function Detail({
                       <summary>
                         {s.name} <Badge value={s.status} />
                       </summary>
+                      <p className="muted">
+                        {s.service} · {s.module ?? '미지정'} · {s.region ?? '미지정'} ·{' '}
+                        {s.instanceId ?? '미지정'}
+                      </p>
                       <pre>{JSON.stringify(s.attributes, null, 2)}</pre>
                     </details>
                   ))}
@@ -267,7 +295,8 @@ export function Detail({
           </div>
           <h3 className="incident-title">{incident.title}</h3>
           <p className="muted">
-            {incident.service} · {incident.environment} · {incident.owner || '담당 미지정'}
+            {incident.service} · {incident.environment} · {incident.region ?? '전체 리전'} ·{' '}
+            {incident.instanceId ?? '그룹'} · {incident.owner || '담당 미지정'}
           </p>
           <div className="form-grid incident-controls">
             <label>
@@ -350,6 +379,12 @@ export function Detail({
                 type: 'briefing',
                 service: incident.service,
                 environment: incident.environment,
+                module: incident.module,
+                region: incident.region,
+                zone: incident.zone,
+                cluster: incident.cluster,
+                namespace: incident.namespace,
+                instanceId: incident.instanceId,
               })
             }
           >

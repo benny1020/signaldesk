@@ -8,7 +8,9 @@ export class SignalDeskClient {
     maxQueue = 1000,
     fetchImpl = fetch,
     onError = () => {},
+    resource = {},
   } = {}) {
+    this.resource = resource;
     this.endpoint = endpoint.replace(/\/$/, '');
     this.token = token;
     this.workspace = workspace;
@@ -26,6 +28,7 @@ export class SignalDeskClient {
       return false;
     }
     this.queue.push({
+      ...this.resource,
       ...event,
       id: event.id ?? crypto.randomUUID(),
       timestamp: event.timestamp ?? Date.now(),

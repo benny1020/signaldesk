@@ -43,3 +43,13 @@ AI monitoring has two different responsibilities. **Observe AI services:** provi
 **Use AI to operate services:** summarize evidence, propose testable hypotheses and link sources. This release implements a local deterministic evidence briefing, labelled as such. It does not call a model, claim a root cause or send incident data to an external AI provider. A future provider must require explicit opt-in, redaction, bounded evidence, model/prompt/version audit and source-linked hypotheses. It must not close incidents or remediate infrastructure autonomously. A model-generated confident paragraph is not root-cause evidence.
 
 OTel interoperability is intentionally bounded: this release exposes a native JSON contract and an OTLP/HTTP JSON trace bridge, not protobuf or gRPC. Schema mapping is versioned locally rather than promising indefinite alignment with evolving GenAI conventions.
+
+## Multiple deployments and platform replicas
+
+[OpenTelemetry service resources](https://opentelemetry.io/docs/specs/semconv/resource/service/) and [cloud resources](https://opentelemetry.io/docs/specs/semconv/resource/cloud/) establish service instance and region/zone identities. Adopt the identity across metrics/logs/spans rather than placing region only in a UI label. Preserve Kubernetes cluster/namespace separately. Default alert grouping must isolate faulty replicas rather than hiding them in service averages.
+
+[PostgreSQL advisory locks](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS) provide session ownership; short transaction locks serialize control changes. Implemented connection-loss fencing was tested with real backend termination. This choice requires direct connections/session pooling and is not compatible with transaction pooling.
+
+[Collector OTLP HTTP config at 0.162.0](https://github.com/open-telemetry/opentelemetry-collector/blob/v0.162.0/exporter/otlphttpexporter/config.go) supplies explicit JSON encoding; current component metadata uses `otlp_http`. The default exporter sends gzip, so API decompression and expanded body limits were tested. [Fastify compression](https://github.com/fastify/fastify-compress) supports Fastify 5 request decompression independently of response compression.
+
+[Collector file storage](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.162.0/extension/storage/filestorage/README.md) is beta at this release. Adopt as a pinned regional trace queue reference with persistent writable volume and recovery acceptance, not a zero-loss guarantee. Native logs/metrics still need a durable ingestion path. See [the actual topology and volume limits](MULTI_REGION.md).

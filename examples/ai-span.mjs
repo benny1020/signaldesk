@@ -2,6 +2,13 @@ import { SignalDeskClient } from '../packages/sdk/index.js';
 const client = new SignalDeskClient({
   endpoint: process.env.SIGNALDESK_URL,
   token: process.env.SIGNALDESK_TOKEN,
+  resource: {
+    module: 'assistant',
+    region: process.env.REGION ?? 'example-local',
+    instanceId: 'example-ai-1',
+    cluster: 'example',
+    namespace: 'examples',
+  },
 });
 client.emit({
   kind: 'span',

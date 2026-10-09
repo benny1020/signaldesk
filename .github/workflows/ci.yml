@@ -24,5 +24,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - run: npm ci
       - name: Authenticated container and restart acceptance
         run: node scripts/container-smoke.mjs signaldesk:ci
+      - name: Shared PostgreSQL and four-process acceptance
+        run: node scripts/postgres-smoke.mjs signaldesk:ci

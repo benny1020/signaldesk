@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Globe,
   LayoutDashboard,
   Boxes,
   Server,
@@ -21,7 +22,12 @@ import {
   ArrowUpRight,
   RefreshCw,
 } from 'lucide-react';
-import type { Dashboard, Alert } from '../../../packages/contracts/src/index';
+import type {
+  Dashboard,
+  Alert,
+  ResourceSummary,
+  Page,
+} from '../../../packages/contracts/src/index';
 import {
   Overview,
   Services,
@@ -36,6 +42,8 @@ import {
   type Selection,
   type PageProps,
 } from './Pages';
+import { ResourceScope, Deployments } from './Deployments';
+import { dimensionKeys } from '../../../packages/contracts/src/index';
 import { Dialog, Empty } from './components';
 import { CreateForm } from './Forms';
 import { Detail } from './Detail';
@@ -52,6 +60,12 @@ const navigation = [
     name: '서비스 및 API',
     icon: Boxes,
     description: '요청량, 오류, 응답 지연을 서비스별로 비교합니다.',
+  },
+  {
+    key: 'deployments',
+    name: '배포 및 인스턴스',
+    icon: Globe,
+    description: '리전·모듈·클러스터별 배포와 인스턴스를 비교합니다.',
   },
   {
     key: 'hosts',
@@ -104,6 +118,7 @@ const navigation = [
 ];
 const pages: Record<string, (p: PageProps) => React.ReactNode> = {
   overview: Overview,
+  deployments: Deployments,
   services: Services,
   hosts: Infrastructure,
   logs: Logs,
@@ -135,13 +150,14 @@ export default function App() {
   const params = useMemo(
     () => ({
       workspace,
+      ...Object.fromEntries(dimensionKeys.map((key) => [key, url.get(key) || undefined])),
       environment: env || undefined,
       service: service || undefined,
       rangeMinutes: Number(range),
       from: url.has('from') ? Number(url.get('from')) : undefined,
       to: url.has('to') ? Number(url.get('to')) : undefined,
     }),
-    [workspace, env, service, range, url.get('from'), url.get('to')],
+    [workspace, env, service, range, url.toString()],
   );
   const bootstrap = useQuery({
     queryKey: ['bootstrap', workspace],
@@ -156,6 +172,13 @@ export default function App() {
     queryFn: () => request<Dashboard>('/api/dashboard?' + queryString(params)),
     enabled: bootstrap.isSuccess,
     refetchInterval: paused ? false : 5000,
+  });
+  const inventory = useQuery({
+    queryKey: ['inventory', workspace],
+    queryFn: () =>
+      request<Page<ResourceSummary>>('/api/resources?' + queryString({ workspace, limit: 10000 })),
+    enabled: bootstrap.isSuccess,
+    refetchInterval: paused ? false : 10000,
   });
   const current = navigation.find((n) => n.key === page)!,
     PageComponent = pages[page];
@@ -215,6 +238,15 @@ export default function App() {
         params,
         select: setSelection,
         navigate,
+        focusResource: (r, next = 'logs') => {
+          update({
+            page: next,
+            service: r.service,
+            environment: r.environment,
+            ...Object.fromEntries(dimensionKeys.map((key) => [key, r[key]])),
+          });
+          setSelection(null);
+        },
         mutate,
         openForm: (kind, alert) => setForm({ kind, alert }),
         paused,
@@ -286,6 +318,7 @@ export default function App() {
                   workspace: e.target.value,
                   service: undefined,
                   environment: undefined,
+                  ...Object.fromEntries(dimensionKeys.map((key) => [key, undefined])),
                   from: undefined,
                   to: undefined,
                 });
@@ -306,6 +339,7 @@ export default function App() {
           {navigation.map((item, i) => (
             <a
               key={item.key}
+              aria-label={item.name}
               href={
                 '?' + new URLSearchParams({ ...Object.fromEntries(url), page: item.key }).toString()
               }
@@ -333,7 +367,7 @@ export default function App() {
           <div>
             <span className="operator-avatar">OP</span>
             <span>
-              Operations workspace<small>v0.1.0</small>
+              Operations workspace<small>v0.2.0</small>
             </span>
           </div>
         </div>
@@ -349,6 +383,7 @@ export default function App() {
                   workspace: workspace === 'demo' ? 'live' : 'demo',
                   service: undefined,
                   environment: undefined,
+                  ...Object.fromEntries(dimensionKeys.map((key) => [key, undefined])),
                   from: undefined,
                   to: undefined,
                 });
@@ -417,6 +452,12 @@ export default function App() {
             </button>
           </div>
         </header>
+        <ResourceScope
+          params={params}
+          resources={inventory.data?.items ?? []}
+          update={update}
+          truncated={inventory.data?.truncated ?? false}
+        />
         <main>
           <div className="page-heading">
             <div>
@@ -460,6 +501,7 @@ export default function App() {
                     workspace: 'live',
                     service: undefined,
                     environment: undefined,
+                    ...Object.fromEntries(dimensionKeys.map((key) => [key, undefined])),
                     from: undefined,
                     to: undefined,
                   })
@@ -492,7 +534,7 @@ export default function App() {
             </div>
           ) : (
             <>
-              {props.data.truncated && page !== 'overview' && (
+              {props.data.truncated && (
                 <div className="notice">
                   조회 상한 내 표본이 표시됩니다. 전체 분석이 필요하면 시간 범위를 좁히세요. 로그는
                   다음 페이지로 더 탐색할 수 있습니다.

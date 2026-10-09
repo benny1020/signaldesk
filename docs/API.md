@@ -1,10 +1,10 @@
 # API reference
 
-Version 0.1. Native contract: `packages/contracts/src/index.ts`. Content-Type: `application/json`. No CORS is enabled; serve the UI and API from the same origin. In local mode loopback Host and Origin are enforced. In token mode use an Authorization bearer token.
+Version 0.2. Native contract: `packages/contracts/src/index.ts`. Content-Type: `application/json`. No CORS is enabled; serve the UI and API from the same origin. In local mode loopback Host and Origin are enforced. In token mode use an Authorization bearer token.
 
 ## Scope and roles
 
-Queries use `workspace=demo|live`, optional `environment`, `service`, `from`, `to` (Unix ms) and `rangeMinutes` (default 60). Ranges are ordered and at most seven days. Demo defaults to its fixed fixture clock; Live defaults to current time. Rules and incidents are control records and are filtered by service/environment, not hidden just because their creation time is outside a chart window.
+Queries use `workspace=demo|live`, optional `environment`, `service`, `module`, `region`, `zone`, `cluster`, `namespace`, `instanceId`, `from`, `to` (Unix ms) and `rangeMinutes` (default 60). Ranges are ordered and at most seven days. Demo defaults to its fixed fixture clock; Live defaults to current time. Rules and incidents are control records and are filtered by service/environment/deployment identity, not hidden just because their creation time is outside a chart window.
 
 | Role   | Scope                                                           |
 | ------ | --------------------------------------------------------------- |
@@ -16,32 +16,35 @@ Local mode is equivalent to a local operator and is never allowed on a non-loopb
 
 ## Endpoints
 
-| Method       | Path                        | Behavior / role                                                                                               |
-| ------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| GET          | `/health`                   | Minimal unauthenticated liveness                                                                              |
-| GET          | `/api/bootstrap`            | Runtime mode, demo clock, capability flags / read                                                             |
-| GET          | `/api/dashboard`            | Bounded correlated service/host/chart/AI view / read                                                          |
-| POST         | `/api/ingest`               | Atomic native events / ingest                                                                                 |
-| POST         | `/api/v1/traces`            | Bounded OTLP HTTP JSON trace bridge / ingest                                                                  |
-| GET          | `/api/logs`                 | Message `search`, `level`, `limit`, keyset `cursor` / read                                                    |
-| GET          | `/api/spans`                | Paged spans / read                                                                                            |
-| GET          | `/api/traces/:traceId`      | Indexed exact trace, ignores service filter to include cross-service children; honors environment/time / read |
-| GET          | `/api/export`               | JSON log page, max 10,000, truncation flag / read                                                             |
-| GET          | `/api/briefing`             | Deterministic evidence summary and hypotheses / read                                                          |
-| POST         | `/api/rules/preview`        | Sample-level threshold comparison / read                                                                      |
-| POST / PATCH | `/api/rules[/:id]`          | Create/update scoped rule / admin                                                                             |
-| PATCH        | `/api/alerts/:id`           | `acknowledged`, `snoozeMinutes` 0–1440 / admin                                                                |
-| POST / PATCH | `/api/incidents[/:id]`      | Create, status/owner/note changes / admin                                                                     |
-| GET          | `/api/connections`          | Health, channel metadata, probes, last 100 deliveries/audit / read                                            |
-| POST / PATCH | `/api/channels[/:id]`       | Create HTTPS destination, toggle enabled; Live only / admin                                                   |
-| POST / PATCH | `/api/probes[/:id]`         | Create HTTPS GET check, toggle enabled; Live only / admin                                                     |
-| POST         | `/api/deliveries/:id/retry` | Reset failed delivery attempt budget / admin                                                                  |
+| Method       | Path                        | Behavior / role                                                                                                                    |
+| ------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| GET          | `/health`                   | Unauthenticated process + database health                                                                                          |
+| GET          | `/api/bootstrap`            | Runtime mode, demo clock, capability flags / read                                                                                  |
+| GET          | `/api/dashboard`            | Bounded correlated service/host/chart/AI view / read                                                                               |
+| GET / PATCH  | `/api/resources[/:id]`      | Scoped inventory / explicit `{retired:boolean}` lifecycle, read / admin                                                            |
+| POST         | `/api/ingest`               | Atomic native events / ingest                                                                                                      |
+| POST         | `/api/v1/traces`            | Bounded OTLP HTTP JSON trace bridge / ingest                                                                                       |
+| GET          | `/api/logs`                 | Message `search`, `level`, `limit`, keyset `cursor` / read                                                                         |
+| GET          | `/api/spans`                | Paged spans / read                                                                                                                 |
+| GET          | `/api/traces/:traceId`      | Indexed exact trace, expands service/deployment filters to include cross-region children; honors workspace/environment/time / read |
+| GET          | `/api/export`               | JSON log page, max 10,000, truncation flag / read                                                                                  |
+| GET          | `/api/briefing`             | Deterministic evidence summary and hypotheses / read                                                                               |
+| POST         | `/api/rules/preview`        | Latest resource/region/service group threshold comparison / read                                                                   |
+| POST / PATCH | `/api/rules[/:id]`          | Create/update scoped rule / admin                                                                                                  |
+| PATCH        | `/api/alerts/:id`           | `acknowledged`, `snoozeMinutes` 0–1440 / admin                                                                                     |
+| POST / PATCH | `/api/incidents[/:id]`      | Create, status/owner/note changes / admin                                                                                          |
+| GET          | `/api/connections`          | Health, channel metadata, probes, last 100 deliveries/audit / read                                                                 |
+| POST / PATCH | `/api/channels[/:id]`       | Create HTTPS destination, toggle enabled; Live only / admin                                                                        |
+| POST / PATCH | `/api/probes[/:id]`         | Create HTTPS GET check, toggle enabled; Live only / admin                                                                          |
+| POST         | `/api/deliveries/:id/retry` | Reset failed delivery attempt budget / admin                                                                                       |
 
-Lists return `{items,nextCursor,truncated}` for telemetry. Cursor order is timestamp and event ID descending. Treat cursors as opaque. HTTP 400 indicates invalid input, 401 missing/invalid token, 403 scope/role denial, 404 missing item, 429 rate limit and 507 storage capacity. The API has a 1 MiB request body limit and a default 240 requests/minute per client IP. Behind a proxy configure an explicit trusted-client strategy before changing this limiter.
+Lists return `{items,nextCursor,truncated}` for telemetry. Cursor order is timestamp and event ID descending. Treat cursors as opaque. HTTP 400 indicates invalid input, 401 missing/invalid token, 403 scope/role denial, 404 missing item, 429 rate limit and 507 storage/cardinality capacity, 503 operational database/worker availability errors. The API has a 1 MiB expanded request body limit (gzip supported) and a default 240 requests/minute per client IP. Behind a proxy configure an explicit trusted-client strategy before changing this limiter.
 
 ## Events
 
-Common fields: optional stable `id` (max 128), `timestamp`, nonempty `service`, `environment` (defaults production). Unknown object keys are stripped; message attributes have scalar values. Producer IDs deduplicate within a workspace. Do not reuse an ID for a different event.
+Common resource fields: optional `module`, `region`, `zone`, `cluster`, `namespace`, `instanceId` (each 1–128 characters), and `host`. All event kinds support them. Missing legacy fields normalize to `unknown`; instanceId falls back to host. `REQUIRE_RESOURCE_IDENTITY=true` rejects incomplete module/region/instance identities atomically. Resource selectors are exact-match.
+
+Other common fields: optional stable `id` (max 128), `timestamp`, nonempty `service`, `environment` (defaults production). Unknown object keys are stripped; message attributes have scalar values. Producer IDs deduplicate within a workspace. Do not reuse an ID for a different event.
 
 ```json
 {
@@ -49,6 +52,11 @@ Common fields: optional stable `id` (max 128), `timestamp`, nonempty `service`, 
   "timestamp": 1791475200000,
   "service": "orders-api",
   "environment": "production",
+  "module": "api",
+  "region": "ap-northeast-2",
+  "cluster": "commerce-prod",
+  "namespace": "orders",
+  "instanceId": "orders-pod-1",
   "name": "error_pct",
   "value": 0.4
 }
@@ -126,7 +134,7 @@ Span status is ok/error; parentSpanId links children within the trace. Cost requ
 }
 ```
 
-Resource service.name and deployment.environment.name map to native scope. Nanosecond strings map to millisecond timestamps and duration. Scalar attributes are supported; content bodies are stripped. Error status code 2 maps to error. `gen_ai.provider.name`, request.model and usage.input_tokens/output_tokens map to AI fields only when both measured token attributes exist. Otherwise the span remains a normal span with model metadata attributes. Up to 1,000 spans in one request after flattening. This is not a full OTel collector/exporter.
+Resource `service.name` and `deployment.environment.name` map to service/environment. `service.namespace` maps to module (`signaldesk.module` overrides); `cloud.region`, `cloud.availability_zone`, `k8s.cluster.name`, `k8s.namespace.name`, `service.instance.id` (fallback `k8s.pod.uid`) and `host.id`/`host.name` preserve deployment identity. The Collector reference explicitly sets JSON export and was tested with real gzip delivery; default protobuf is not supported. Nanosecond strings map to millisecond timestamps and duration. Scalar attributes are supported; content bodies are stripped. Error status code 2 maps to error. `gen_ai.provider.name`, request.model and usage.input_tokens/output_tokens map to AI fields only when both measured token attributes exist. Otherwise the span remains a normal span with model metadata attributes. Up to 1,000 spans in one request after flattening. This is not a full OTel collector/exporter.
 
 ## Rules
 
@@ -141,14 +149,19 @@ Resource service.name and deployment.environment.name map to native scope. Nanos
   "durationSec": 60,
   "severity": "critical",
   "noData": "alert",
-  "enabled": true
+  "enabled": true,
+  "groupBy": "resource"
 }
 ```
 
-Worker checks every 5 seconds. It selects the most recent measurement for the exact service/environment/metric within two minutes. Sustained violation holds pendingSince; clearing the condition resets it and resolves an active alert. Disabling the rule resolves its active alert. No-data is explicit rather than synthesized zero. Demo rules are editable samples, but only Live rules are background-evaluated.
+Worker checks every 5 seconds. `groupBy` is `resource` (default), `region`, or `service`; rules can narrow deployment fields. It selects latest gauges per matching identity within two minutes, with independent durable pending/firing/recovery per group. Region/service request rates sum; error percentage requires same-resource request weights; latency/CPU/memory/probe duration use maximum, and probe_up uses minimum. Maximum p95 is not population p95. Missing aggregate weights produce no-data. Retired resources are excluded; absent known active resources remain expected and can trigger no-data. Empty new scopes use an unknown placeholder until resources appear.
+
+Sustained violation holds group pendingSince. Clearing resolves that group's active alert; disabling resolves all its active groups. Editing a rule resets pending duration through configuration revision. No-data is explicit rather than zero. Query bounds cause evaluator failure rather than treating partial input as complete. Demo rules are editable samples but only Live rules are background-evaluated.
+
+`/api/rules/preview` returns `samples` (history points), `groupCount`, `violations` (currently violating groups), `noDataGroups` and `latest` (maximum current group value). This is a latest-snapshot preview, not historical duration simulation. Dashboard alert/incident state is current control state alongside the selected chart window. Inventory is known identities first observed before window end, not just resources reporting inside the window.
 
 ## Incident and notification semantics
 
-Create incident: title, service, environment, severity, owner and optional scoped alertId. Patch: investigating/identified/monitoring/resolved status, owner and/or note. Timeline entries record actor/time. An incident is not automatically closed when its alert recovers.
+Create incident: title, service, environment, optional deployment identity, severity, owner and optional scoped alertId. Patch: investigating/identified/monitoring/resolved status, owner and/or note. Timeline entries record actor/time. An incident is not automatically closed when its alert recovers.
 
 The generic webhook body is `{source:"signaldesk",deliveryId,alert}`. New Live alert creation and outbox insertion are one control transaction. Pending delivery may be deferred by snooze or cancelled on recovery/channel disable. HTTP 2xx succeeds; redirects do not. Failures retry with bounded exponential delay, five attempts total. Crash after remote success can redeliver: deduplicate deliveryId. Acknowledge is independent from delivery and incident state.

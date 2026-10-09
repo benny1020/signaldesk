@@ -1,11 +1,17 @@
 import Fastify, { type FastifyRequest } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
+import compress from '@fastify/compress';
 import staticFiles from '@fastify/static';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
+  dimensionSchema,
+  dimensionKeys,
+  type ResourceSelector,
+  identity,
+  resourceKey,
   ingestSchema,
   ruleSchema,
   workspaceSchema,
@@ -15,9 +21,11 @@ import {
   type Alert,
   type Incident,
   type TelemetryEvent,
+  type Metric,
 } from '../../../packages/contracts/src/index.ts';
-import { Store, type TelemetryStore, sanitize } from './store.ts';
-import { Engine, type Channel, type Probe } from './engine.ts';
+import { type TelemetryStore, sanitize } from './store.ts';
+import type { Storage } from './storage.ts';
+import { Engine, ruleGroup, ruleValue, type Channel, type Probe } from './engine.ts';
 import { encrypt, safeRequest } from './network.ts';
 import { dashboard, briefing } from './queries.ts';
 export type AccessToken = {
@@ -32,8 +40,13 @@ export type Config = {
   key: Buffer;
   allowedHosts: string[];
   logger?: boolean;
+  resource?: ResourceSelector;
+  deploymentEnvironment?: string;
+  role?: string;
+  requireResourceIdentity?: boolean;
 };
 const scopeSchema = z.object({
+  ...dimensionSchema,
   workspace: workspaceSchema.default('demo'),
   from: z.coerce.number().int().nonnegative().optional(),
   to: z.coerce.number().int().nonnegative().optional(),
@@ -46,6 +59,7 @@ const scopeSchema = z.object({
   level: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 });
 const incidentInput = z.object({
+  ...dimensionSchema,
   title: z.string().min(1).max(180),
   service: z.string().max(100),
   environment: z.string().min(1).max(50).default('production'),
@@ -55,11 +69,16 @@ const incidentInput = z.object({
 });
 const httpError = (message: string, statusCode = 400) =>
   Object.assign(new Error(message), { statusCode });
-export async function createApp(store: Store, config: Config, telemetry: TelemetryStore = store) {
+export async function createApp(store: Storage, config: Config, telemetry: TelemetryStore = store) {
   const app = Fastify({
     logger: config.logger ?? false,
     bodyLimit: 1024 * 1024,
     requestTimeout: 10000,
+  });
+  await app.register(compress, {
+    globalCompression: false,
+    globalDecompression: true,
+    requestEncodings: ['gzip'],
   });
   await app.register(rateLimit, { max: 240, timeWindow: '1 minute' });
   const engine = new Engine(
@@ -67,7 +86,20 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
     config.key,
     (url, body) => safeRequest(url, body, config.allowedHosts),
     telemetry,
+    config.resource,
   );
+  app.addHook('onRoute', (route) => {
+    if (
+      !route.url.startsWith('/api/') ||
+      !['POST', 'PATCH'].includes(String(route.method)) ||
+      ['/api/ingest', '/api/v1/traces', '/api/rules/preview'].includes(route.url)
+    )
+      return;
+    const handler = route.handler;
+    route.handler = async function (req, reply) {
+      return store.withControl(async () => handler.call(this, req, reply));
+    };
+  });
   const counts = { accepted: 0, rejected: 0, requests: 0, errors: 0, durations: [] as number[] };
   app.addHook('onRequest', async (req, reply) => {
     reply
@@ -75,6 +107,7 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
       .header('Referrer-Policy', 'no-referrer')
       .header('X-Frame-Options', 'DENY');
     if (!req.url.startsWith('/api/')) return;
+    if (config.role === 'worker') throw httpError('Worker exposes health only', 404);
     if (config.mode === 'local') {
       const host = req.hostname.split(':')[0];
       if (!['localhost', '127.0.0.1', '[::1]'].includes(host))
@@ -106,7 +139,8 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
         kind: 'span',
         timestamp: Math.round(timestamp - reply.elapsedTime),
         service: 'signaldesk-api',
-        environment: 'local',
+        environment: config.deploymentEnvironment ?? 'local',
+        ...config.resource,
         traceId,
         spanId: traceId.slice(0, 16),
         name,
@@ -120,7 +154,8 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
         kind: 'log',
         timestamp,
         service: 'signaldesk-api',
-        environment: 'local',
+        environment: config.deploymentEnvironment ?? 'local',
+        ...config.resource,
         level: 'error',
         message: name + ' failed with HTTP ' + reply.statusCode,
         traceId,
@@ -142,7 +177,8 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
       });
       return;
     }
-    const status = err.statusCode ?? 400;
+    const operationalCode = (error as { code?: string }).code;
+    const status = err.statusCode ?? (operationalCode ? 503 : 500);
     reply.status(status).send({
       error: status >= 500 ? 'Service unavailable; inspect server health and logs' : err.message,
     });
@@ -166,63 +202,100 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
       throw httpError('Role does not permit this action', 403);
     return token.name;
   }
-  function scope(req: FastifyRequest, role: 'read' | 'write' = 'read'): QueryScope {
+  async function scope(req: FastifyRequest, role: 'read' | 'write' = 'read'): Promise<QueryScope> {
     const q = scopeSchema.parse(req.query),
       workspace = q.workspace;
     access(req, workspace, role);
-    const demoNow = (
-      store.db.prepare("SELECT value FROM settings WHERE key='demoNow'").get() as
-        { value: string } | undefined
-    )?.value;
+    const demoNow = await store.setting('demoNow');
     const to = q.to ?? (workspace === 'demo' && demoNow ? Number(demoNow) : Date.now()),
       from = q.from ?? to - q.rangeMinutes * 60000;
     if (from > to || to - from > 7 * 86400000)
       throw httpError('Time range must be ordered and at most seven days');
     return { ...q, to, from };
   }
-  const getEntity = <T>(kind: string, id: string, workspace: Workspace) => {
-    const e = store.get<T>(kind, id, workspace);
+  const getEntity = async <T>(kind: string, id: string, workspace: Workspace) => {
+    const e = await store.get<T>(kind, id, workspace);
     if (!e) throw httpError('Item not found', 404);
     return e;
   };
   const actor = (req: FastifyRequest, w: Workspace) => access(req, w, 'write');
-  app.get('/health', async () => ({ status: 'ok', version: '0.1.0' }));
+  app.get('/health', async () => {
+    await store.setting('demoNow');
+    return { status: 'ok', version: '0.2.0', backend: store.backend, role: config.role ?? 'all' };
+  });
   app.get('/api/bootstrap', async (req) => {
     const w = workspaceSchema.parse((req.query as { workspace?: string }).workspace ?? 'demo');
     access(req, w);
     return {
       mode: config.mode,
       workspace: w,
-      demoNow: Number(
-        (
-          store.db.prepare("SELECT value FROM settings WHERE key='demoNow'").get() as
-            { value: string } | undefined
-        )?.value ?? Date.now(),
-      ),
-      version: '0.1.0',
+      demoNow: Number((await store.setting('demoNow')) ?? Date.now()),
+      version: '0.2.0',
       capabilities: {
         nativeJson: true,
+        resourceDimensions: dimensionKeys,
+        requireResourceIdentity: config.requireResourceIdentity ?? false,
+        sharedStorage: store.backend === 'postgres',
         otlpJsonTraces: true,
         otlpProtobuf: false,
         modelDiagnosis: false,
       },
     };
   });
-  app.get('/api/dashboard', async (req) => dashboard(store, scope(req), telemetry));
-  app.get('/api/briefing', async (req) => briefing(store, scope(req), telemetry));
-  app.get('/api/logs', async (req) => telemetry.query('log', scope(req)));
-  app.get('/api/spans', async (req) => telemetry.query('span', scope(req)));
+  app.get('/api/resources', async (req) => {
+    const q = await scope(req);
+    if (!telemetry.inventory) throw httpError('Storage does not implement resource inventory', 501);
+    return telemetry.inventory(q);
+  });
+  app.patch('/api/resources/:id', async (req) => {
+    const q = await scope(req, 'write'),
+      id = (req.params as { id: string }).id,
+      retired = z.object({ retired: z.boolean() }).parse(req.body).retired;
+    if (!(await store.retireResource(id, q.workspace, retired)))
+      throw httpError('Resource not found', 404);
+    await store.audit(
+      q.workspace,
+      actor(req, q.workspace),
+      retired ? 'resource.retired' : 'resource.resumed',
+      id,
+    );
+    return { id, retired };
+  });
+  app.get('/api/dashboard', async (req) => dashboard(store, await scope(req), telemetry));
+  app.get('/api/briefing', async (req) => briefing(store, await scope(req), telemetry));
+  app.get('/api/logs', async (req) => telemetry.query('log', await scope(req)));
+  app.get('/api/spans', async (req) => telemetry.query('span', await scope(req)));
   app.get('/api/traces/:id', async (req) => {
-    const q = scope(req),
+    const q = await scope(req),
       id = z
         .string()
         .max(128)
         .parse((req.params as { id: string }).id);
-    return telemetry.query('span', { ...q, service: undefined, traceId: id, limit: 1000 });
+    return telemetry.query('span', {
+      ...q,
+      service: undefined,
+      ...Object.fromEntries(dimensionKeys.map((key) => [key, undefined])),
+      traceId: id,
+      limit: 1000,
+    });
   });
+  const checkResourceIdentity = (events: TelemetryEvent[]) => {
+    if (
+      config.requireResourceIdentity &&
+      events.some((e) =>
+        ['region', 'module', 'instanceId'].some(
+          (key) => !e[key as keyof TelemetryEvent] || e[key as keyof TelemetryEvent] === 'unknown',
+        ),
+      )
+    )
+      throw httpError(
+        'Production ingestion requires explicit region, module and instanceId on every event',
+      );
+  };
   app.post('/api/ingest', async (req) => {
     const data = ingestSchema.parse(req.body);
     access(req, data.workspace, 'ingest');
+    checkResourceIdentity(data.events);
     const now = Date.now();
     if (data.events.some((e) => e.timestamp > now + 60000 || e.timestamp < now - 7 * 86400000))
       throw httpError('Events must be within retention and at most 60 seconds in the future');
@@ -298,6 +371,13 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
             timestamp: Number(BigInt(s.startTimeUnixNano) / 1000000n),
             durationMs: Number(BigInt(s.endTimeUnixNano) - BigInt(s.startTimeUnixNano)) / 1000000,
             service: String(resource['service.name'] ?? 'unknown-service'),
+            module: resource['signaldesk.module'] ?? resource['service.namespace'],
+            region: resource['cloud.region'],
+            zone: resource['cloud.availability_zone'],
+            cluster: resource['k8s.cluster.name'],
+            namespace: resource['k8s.namespace.name'],
+            instanceId: resource['service.instance.id'] ?? resource['k8s.pod.uid'],
+            host: resource['host.id'] ?? resource['host.name'],
             environment: String(resource['deployment.environment.name'] ?? 'production'),
             status: s.status?.code === 2 ? 'error' : 'ok',
             attributes,
@@ -320,66 +400,118 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
       now = Date.now();
     if (parsed.events.some((e) => e.timestamp > now + 60000 || e.timestamp < now - 7 * 86400000))
       throw httpError('Span timestamp outside retention');
+    checkResourceIdentity(parsed.events);
     const accepted = await telemetry.append(w, parsed.events.map(sanitize));
     counts.accepted += accepted;
     return { partialSuccess: {} };
   });
   app.post('/api/rules/preview', async (req) => {
-    const q = scope(req),
-      input = ruleSchema.parse(req.body);
-    const page = await telemetry.query('metric', {
+    const q = await scope(req),
+      input = ruleSchema.parse(req.body),
+      selected = {
         ...q,
+        ...Object.fromEntries(dimensionKeys.map((key) => [key, input[key]])),
         service: input.service,
         environment: input.environment,
-        metric: input.metric,
         limit: 10000,
-      }),
-      rows = page.items;
-    const last = rows[0];
+      };
+    const [history, latest, inventory] = await Promise.all([
+      telemetry.query('metric', { ...selected, metric: input.metric }),
+      telemetry.latestMetrics
+        ? telemetry.latestMetrics({ ...selected, from: q.to - 120000 })
+        : telemetry.query('metric', { ...selected, from: q.to - 120000 }),
+      telemetry.inventory ? telemetry.inventory(selected) : null,
+    ]);
+    const retired = new Set(inventory?.items.filter((r) => r.retired).map(resourceKey) ?? []),
+      samples = new Map<string, Metric[]>();
+    for (const m of latest.items as Metric[]) {
+      const key = resourceKey(m);
+      if (retired.has(key)) continue;
+      const rows = samples.get(key) ?? [];
+      if (!rows.some((r) => r.name === m.name)) rows.push(m);
+      samples.set(key, rows);
+    }
+    const groups = new Map<string, Set<string>>(),
+      rule: Rule = { ...input, id: 'preview', workspace: q.workspace, pendingSince: null };
+    for (const resource of [
+      ...(inventory?.items.filter((r) => !r.retired) ?? []),
+      ...latest.items,
+    ]) {
+      if (retired.has(resourceKey(resource))) continue;
+      const key = ruleGroup(rule, identity(resource)),
+        group = groups.get(key) ?? new Set<string>();
+      group.add(resourceKey(resource));
+      groups.set(key, group);
+    }
+    if (!groups.size && !retired.size) groups.set('unobserved', new Set());
+    const values = [...groups].map(([key, resources]) => {
+      const rows = [...resources].flatMap((resource) => samples.get(resource) ?? []),
+        value = ruleValue(input.metric, rows),
+        noData =
+          value === null ||
+          [...resources].some(
+            (resource) => !(samples.get(resource) ?? []).some((m) => m.name === input.metric),
+          );
+      return {
+        key,
+        value,
+        noData,
+        violated: noData
+          ? input.noData === 'alert'
+          : value !== null &&
+            (input.operator === 'gt' ? value > input.threshold : value < input.threshold),
+      };
+    });
+    const known = values.flatMap((v) => (v.value === null ? [] : [v.value]));
     return {
-      samples: rows.length,
-      latest: last?.kind === 'metric' ? last.value : null,
-      violations: rows.filter(
-        (e) =>
-          e.kind === 'metric' &&
-          (input.operator === 'gt' ? e.value > input.threshold : e.value < input.threshold),
-      ).length,
-      truncated: page.truncated,
+      samples: history.items.length,
+      latest: known.length ? Math.max(...known) : null,
+      violations: values.filter((v) => v.violated).length,
+      groupCount: values.length,
+      noDataGroups: values.filter((v) => v.noData).length,
+      groups: values.slice(0, 20),
+      truncated: history.truncated || latest.truncated || !!inventory?.truncated,
+      limitations: 'Current group snapshot only; duration is evaluated by the worker over time',
     };
   });
   app.post('/api/rules', async (req) => {
-    const q = scope(req, 'write');
-    if (store.rules(q.workspace).length >= 100) throw httpError('Rule limit reached');
+    const q = await scope(req, 'write');
+    if ((await store.rules(q.workspace)).length >= 100) throw httpError('Rule limit reached');
     const rule: Rule = {
       ...ruleSchema.parse(req.body),
       id: randomUUID(),
       workspace: q.workspace,
       pendingSince: null,
     };
-    store.put('rule', rule);
-    store.audit(q.workspace, actor(req, q.workspace), 'rule.created', rule.id);
+    await store.put('rule', rule);
+    await store.audit(q.workspace, actor(req, q.workspace), 'rule.created', rule.id);
     return rule;
   });
   app.patch('/api/rules/:id', async (req) => {
-    const q = scope(req, 'write'),
-      rule = getEntity<Rule>('rule', (req.params as { id: string }).id, q.workspace);
-    const patch = ruleSchema.partial().parse(req.body);
-    const next = { ...rule, ...patch, pendingSince: null };
-    store.put('rule', next);
+    const q = await scope(req, 'write'),
+      rule = await getEntity<Rule>('rule', (req.params as { id: string }).id, q.workspace);
+    const patch = Object.fromEntries(
+      Object.entries(ruleSchema.partial().parse(req.body)).filter(([key]) =>
+        Object.hasOwn(req.body as object, key),
+      ),
+    );
+    // Partial edits must not re-apply create-time defaults to omitted fields.
+    const next = { ...rule, ...patch, pendingSince: null, revision: (rule.revision ?? 0) + 1 };
+    await store.put('rule', next);
     if (!next.enabled)
-      for (const a of store
-        .alerts(q.workspace)
-        .filter((a) => a.ruleId === rule.id && a.status === 'firing')) {
+      for (const a of (await store.alerts(q.workspace, rule.id)).filter(
+        (a) => a.ruleId === rule.id && a.status === 'firing',
+      )) {
         a.status = 'resolved';
         a.resolvedAt = Date.now();
-        store.put('alert', a);
+        await store.put('alert', a);
       }
-    store.audit(q.workspace, actor(req, q.workspace), 'rule.updated', rule.id);
+    await store.audit(q.workspace, actor(req, q.workspace), 'rule.updated', rule.id);
     return next;
   });
   app.patch('/api/alerts/:id', async (req) => {
-    const q = scope(req, 'write'),
-      a = getEntity<Alert>('alert', (req.params as { id: string }).id, q.workspace),
+    const q = await scope(req, 'write'),
+      a = await getEntity<Alert>('alert', (req.params as { id: string }).id, q.workspace),
       patch = z
         .object({
           acknowledged: z.boolean().optional(),
@@ -389,15 +521,16 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
     if (patch.acknowledged !== undefined) a.acknowledged = patch.acknowledged;
     if (patch.snoozeMinutes !== undefined)
       a.snoozedUntil = Date.now() + patch.snoozeMinutes * 60000;
-    store.put('alert', a);
-    store.audit(q.workspace, actor(req, q.workspace), 'alert.updated', a.id);
+    await store.put('alert', a);
+    await store.audit(q.workspace, actor(req, q.workspace), 'alert.updated', a.id);
     return a;
   });
   app.post('/api/incidents', async (req) => {
-    const q = scope(req, 'write'),
+    const q = await scope(req, 'write'),
       input = incidentInput.parse(req.body);
-    if (input.alertId) getEntity<Alert>('alert', input.alertId, q.workspace);
-    if (store.incidents(q.workspace).length >= 1000) throw httpError('Incident limit reached');
+    if (input.alertId) await getEntity<Alert>('alert', input.alertId, q.workspace);
+    if ((await store.incidents(q.workspace)).length >= 1000)
+      throw httpError('Incident limit reached');
     const now = Date.now(),
       incident: Incident = {
         ...input,
@@ -410,13 +543,17 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
           { id: randomUUID(), time: now, text: '장애 등록', actor: actor(req, q.workspace) },
         ],
       };
-    store.put('incident', incident);
-    store.audit(q.workspace, actor(req, q.workspace), 'incident.created', incident.id);
+    await store.put('incident', incident);
+    await store.audit(q.workspace, actor(req, q.workspace), 'incident.created', incident.id);
     return incident;
   });
   app.patch('/api/incidents/:id', async (req) => {
-    const q = scope(req, 'write'),
-      incident = getEntity<Incident>('incident', (req.params as { id: string }).id, q.workspace),
+    const q = await scope(req, 'write'),
+      incident = await getEntity<Incident>(
+        'incident',
+        (req.params as { id: string }).id,
+        q.workspace,
+      ),
       patch = z
         .object({
           status: z.enum(['investigating', 'identified', 'monitoring', 'resolved']).optional(),
@@ -443,38 +580,48 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
         text,
         actor: actor(req, q.workspace),
       });
-    store.put('incident', incident);
-    store.audit(q.workspace, actor(req, q.workspace), 'incident.updated', incident.id);
+    await store.put('incident', incident);
+    await store.audit(q.workspace, actor(req, q.workspace), 'incident.updated', incident.id);
     return incident;
   });
   app.get('/api/connections', async (req) => {
-    const q = scope(req);
+    const q = await scope(req);
+    const workers =
+      q.workspace === 'live'
+        ? await store.list<{
+            id: string;
+            region?: string;
+            heartbeat: number;
+            lastSeen: number;
+            error: string | null;
+          }>('worker', 'live')
+        : [];
+    const currentWorkers = workers.filter((w) => Date.now() - w.lastSeen < 30000);
     return {
-      channels: store.list<Channel>('channel', q.workspace).map(({ encryptedUrl, ...c }) => c),
-      probes: store.list<Probe>('probe', q.workspace),
-      deliveries: store.db
-        .prepare(
-          'SELECT id,alert_id,channel_id,status,attempts,next_at,error,created_at,delivered_at FROM outbox WHERE workspace=? ORDER BY created_at DESC LIMIT 100',
-        )
-        .all(q.workspace),
+      channels: (await store.list<Channel>('channel', q.workspace)).map(
+        ({ encryptedUrl, ...c }) => c,
+      ),
+      probes: await store.list<Probe>('probe', q.workspace),
+      deliveries: await store.deliveries(q.workspace),
       health: {
         ...counts,
         durations: undefined,
         storedEvents: await telemetry.occupancy(),
         capacity: store.maxEvents,
-        workerHeartbeat: engine.heartbeat,
-        workerError: engine.lastError,
+        resourceCapacity: store.maxResources,
+        backend: store.backend,
+        processRole: config.role ?? 'all',
+        resource: config.resource,
+        workerHeartbeat: Math.max(engine.heartbeat, ...currentWorkers.map((w) => w.heartbeat)),
+        workerError: currentWorkers.find((w) => w.error)?.error ?? engine.lastError,
+        workers,
         retentionDays: 7,
       },
-      audit: store.db
-        .prepare(
-          'SELECT time,actor,action,target FROM audit WHERE workspace=? ORDER BY time DESC LIMIT 100',
-        )
-        .all(q.workspace),
+      audit: await store.auditTrail(q.workspace),
     };
   });
   app.post('/api/channels', async (req) => {
-    const q = scope(req, 'write'),
+    const q = await scope(req, 'write'),
       input = z
         .object({ name: z.string().min(1).max(100), url: z.url().max(2000) })
         .parse(req.body),
@@ -483,7 +630,8 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
       throw httpError('An HTTPS URL without embedded credentials is required');
     if (q.workspace === 'demo')
       throw httpError('Notification destinations are available in Live only');
-    if (store.list('channel', q.workspace).length >= 20) throw httpError('Channel limit reached');
+    if ((await store.list('channel', q.workspace)).length >= 20)
+      throw httpError('Channel limit reached');
     const c: Channel = {
       id: randomUUID(),
       workspace: q.workspace,
@@ -492,22 +640,23 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
       enabled: true,
       createdAt: Date.now(),
     };
-    store.put('channel', c);
-    store.audit(q.workspace, actor(req, q.workspace), 'channel.created', c.id);
+    await store.put('channel', c);
+    await store.audit(q.workspace, actor(req, q.workspace), 'channel.created', c.id);
     return { id: c.id, name: c.name, enabled: c.enabled };
   });
   app.patch('/api/channels/:id', async (req) => {
-    const q = scope(req, 'write'),
-      c = getEntity<Channel>('channel', (req.params as { id: string }).id, q.workspace);
+    const q = await scope(req, 'write'),
+      c = await getEntity<Channel>('channel', (req.params as { id: string }).id, q.workspace);
     c.enabled = z.object({ enabled: z.boolean() }).parse(req.body).enabled;
-    store.put('channel', c);
-    store.audit(q.workspace, actor(req, q.workspace), 'channel.updated', c.id);
+    await store.put('channel', c);
+    await store.audit(q.workspace, actor(req, q.workspace), 'channel.updated', c.id);
     return { id: c.id, name: c.name, enabled: c.enabled };
   });
   app.post('/api/probes', async (req) => {
-    const q = scope(req, 'write'),
+    const q = await scope(req, 'write'),
       input = z
         .object({
+          ...dimensionSchema,
           name: z.string().min(1).max(100),
           service: z.string().min(1).max(100),
           environment: z.string().min(1).max(50).default('production'),
@@ -516,7 +665,8 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
         .parse(req.body);
     if (q.workspace === 'demo') throw httpError('Synthetic checks are available in Live only');
     if (new URL(input.url).protocol !== 'https:') throw httpError('Use HTTPS');
-    if (store.list('probe', q.workspace).length >= 10) throw httpError('Probe limit reached');
+    if ((await store.list('probe', q.workspace)).length >= 10)
+      throw httpError('Probe limit reached');
     const p: Probe = {
       ...input,
       id: randomUUID(),
@@ -527,32 +677,28 @@ export async function createApp(store: Store, config: Config, telemetry: Telemet
       lastDurationMs: null,
       lastError: null,
     };
-    store.put('probe', p);
-    store.audit(q.workspace, actor(req, q.workspace), 'probe.created', p.id);
+    await store.put('probe', p);
+    await store.audit(q.workspace, actor(req, q.workspace), 'probe.created', p.id);
     return p;
   });
   app.patch('/api/probes/:id', async (req) => {
-    const q = scope(req, 'write'),
-      p = getEntity<Probe>('probe', (req.params as { id: string }).id, q.workspace);
+    const q = await scope(req, 'write'),
+      p = await getEntity<Probe>('probe', (req.params as { id: string }).id, q.workspace);
     p.enabled = z.object({ enabled: z.boolean() }).parse(req.body).enabled;
-    store.put('probe', p);
-    store.audit(q.workspace, actor(req, q.workspace), 'probe.updated', p.id);
+    await store.put('probe', p);
+    await store.audit(q.workspace, actor(req, q.workspace), 'probe.updated', p.id);
     return p;
   });
   app.post('/api/deliveries/:id/retry', async (req) => {
-    const q = scope(req, 'write'),
+    const q = await scope(req, 'write'),
       id = (req.params as { id: string }).id;
-    const result = store.db
-      .prepare(
-        "UPDATE outbox SET status='pending',attempts=0,next_at=? WHERE id=? AND workspace=? AND status='failed'",
-      )
-      .run(Date.now(), id, q.workspace);
-    if (!result.changes) throw httpError('Failed delivery not found', 404);
-    store.audit(q.workspace, actor(req, q.workspace), 'delivery.retried', id);
+    if (!(await store.retryDelivery(id, q.workspace, Date.now())))
+      throw httpError('Failed delivery not found', 404);
+    await store.audit(q.workspace, actor(req, q.workspace), 'delivery.retried', id);
     return { retried: true };
   });
   app.get('/api/export', async (req, reply) => {
-    const q = scope(req);
+    const q = await scope(req);
     reply.header('content-disposition', 'attachment; filename=signaldesk-logs.json');
     return telemetry.query('log', { ...q, limit: 10000 });
   });

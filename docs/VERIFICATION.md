@@ -1,33 +1,49 @@
 # Verification record
 
-Executed 2026-10-09. This record distinguishes observed acceptance from future production guarantees.
+Executed 2026-10-09 for v0.2. Local acceptance establishes these conditions, not a geographically distributed production certification.
 
-| Check                                      | Observed result                                                                                                                                                                    |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Formatting / TypeScript / production build | Passed locally with Node 26.4.0; dependency versions fixed in lockfile                                                                                                             |
-| Automated integration suite                | 16 tests passed: ingestion, privacy, auth/scope, duration/no-data/recovery, outbox, cursor, persistence, async adapter, exact trace, OTLP JSON and producer queue                  |
-| Dependency audit                           | 0 reported vulnerabilities at verification time                                                                                                                                    |
-| Browser errors                             | Numeric-view switching exposed a React/ECharts DOM reuse issue. Distinct container keys fixed it; repeated graph/table switching in a fresh tab produced no error/warning entries. |
-| Correlated navigation                      | Overview → checkout service → scoped logs → exact trace; 4 spans and DB failure waterfall observed                                                                                 |
-| Alert actions                              | Acknowledgment persisted independently of firing state; 30-minute snooze exposed its own expiry                                                                                    |
-| Rule                                       | Preview showed 96 samples / 26 threshold violations; create reflected in rules table                                                                                               |
-| Incident                                   | Investigation note and status change reflected in persisted timeline                                                                                                               |
-| Live ingestion                             | Sample producer accepted 5 server/API events and 1 AI span; missing AI cost remained null                                                                                          |
-| Real local signals                         | Local host appeared with actual measurements; self-instrumented API spans appeared in Live                                                                                         |
-| Mobile                                     | 390×844 viewport rendered dashboard with no document horizontal overflow; charts and pause/resume worked; viewport override reset                                                  |
-| Outbound HTTPS                             | Read-only request to example.com returned 200 using the pinned DNS sender; no real webhook destination was configured                                                              |
-| Container build                            | Node 24 official image build passed; Docker Desktop credential helper initially hung, recovered with task-scoped anonymous public-registry configuration                           |
-| Container runtime / restart                | Passed with Node v24.21.0: unauthorized read denied, six demo services, Live alert fired/recovered, incident note survived restart. Temporary container/volume removed.            |
-| GitHub CI                                  | [Implementation CI](https://github.com/benny1020/signaldesk/actions/runs/37809435582) passed verify and container jobs at `fbf51fa`, including the synthetic duration regression   |
+| Check                                      | Observed result                                                                                                                                                                                                                                                                   |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Formatting / TypeScript / production build | Passed locally on Node 26.4.0; exact dependencies and lockfile                                                                                                                                                                                                                    |
+| Local automated suite                      | 28 tests passed, zero skipped: resource isolation, weighted aggregates, independent duration/recovery/no-data, retirement/resume, historical latest values, cardinality rollback, strict identity, gzip expanded limit, original auth/privacy/outbox/paging/persistence/SDK tests |
+| Real PostgreSQL integration                | Parent + three subtests passed (four reported): atomic duplicate/history/capacity across pools, competing evaluators and multiple-rule isolation, concurrent acknowledgment/notes, session lock exclusion and backend termination fencing                                         |
+| Four application processes                 | API 2 + worker 2 on shared PostgreSQL: 4 resources across 2 region labels and 2 modules, identical Pod names isolated, global error 0.8% while the affected resource's 8% fired independently                                                                                     |
+| Shared execution recovery                  | Worker A killed, surviving worker processed the new alert; incident notes from both APIs persisted through API restart; retirement stopped the active resource alert                                                                                                              |
+| Load balancer                              | Real Nginx with repository config accepted ingestion; a gateway read succeeded after API A stopped, using remaining API B                                                                                                                                                         |
+| Regional Collector                         | Official contrib 0.162.0 image validated config and exported real JSON/gzip; a trace accepted during API outage survived Collector restart on the same persistent volume, replayed once and preserved region/cluster/instance                                                     |
+| SQLite container                           | Node v24.21.0: unauthorized access denied, six demo services, Live alert firing/recovery and incident note persistence after restart                                                                                                                                              |
+| Deployment configuration                   | Shared Compose validated with generated temporary credentials; two APIs/two workers share PostgreSQL and separate roles                                                                                                                                                           |
+| Browser, 1280×720                          | 3 regions / 45 resources visible; region+checkout filter yielded two replicas; retirement/resume preserved history; instance-to-log drilldown preserved all resource fields                                                                                                       |
+| Cross-region request                       | Demo error → trace showed four spans across two regions, including payment child; exact trace API isolation also tested                                                                                                                                                           |
+| Visualization                              | Regional graph/numeric-table switching worked; three readable region series, explicit request units and maximum-instance p95; screenshots use Demo only                                                                                                                           |
+| Worker UI                                  | Live connection screen displayed individual worker identities, current heartbeat and stale previous-process records                                                                                                                                                               |
+| Mobile, 390×844                            | Six resource filters wrapped without document overflow; deployment tables scroll locally (340px container, 500/1030px content); navigation labels remain accessible; viewport restored                                                                                            |
+| Browser console                            | Fresh verification tab returned no warning/error entries during chart/view/navigation checks                                                                                                                                                                                      |
+| Dependency audit                           | Zero reported vulnerabilities at audit time                                                                                                                                                                                                                                       |
 
-## Local bounded query measurement
+The authenticated SQLite smoke, real PostgreSQL tests, Nginx and Collector outage acceptance run in GitHub Actions. The v0.2 run is linked from the repository's [CI history](https://github.com/benny1020/signaldesk/actions/workflows/ci.yml); confirm the commit shown by the run. Earlier v0.1 checks are historical, not evidence of shared execution.
 
-`npx tsx scripts/benchmark.ts` seeded 100,000 events into an in-memory SQLite store: 60,000 metrics, 30,000 logs and 10,000 spans. Twenty dashboard iterations used the actual capped query/aggregation code. Node 26.4.0 on the development host reported median **11.79 ms**, p95 **17.07 ms**, fixture insertion **422 ms**. This excludes disk I/O, HTTP, remote storage, browser rendering and concurrent ingestion. It is not a production throughput/latency guarantee. Re-run on intended hardware and workloads.
+## Reproduction
 
-Production web bundles at the verification build: application approximately 135 kB gzip, lazy chart chunk approximately 203 kB gzip, stylesheet approximately 11 kB gzip. Font assets are bundled locally. These are build artifacts, not an end-user render benchmark.
+```bash
+npm ci
+npm run check
+npm audit --audit-level=high
+docker build -t signaldesk:local .
+node scripts/container-smoke.mjs signaldesk:local
+npm run test:distributed
+```
+
+Distributed acceptance creates its own database, network, application/Collector/Nginx containers, queue volume and temporary credentials, then removes them. Manual browser checks are documented acceptance, not a committed browser automation suite. No real webhook destination or external LLM provider is configured.
+
+## Bounded local query measurement
+
+`npx tsx scripts/benchmark.ts` inserted 100,000 fixture events into in-memory SQLite: 60,000 metrics, 30,000 logs, 10,000 spans. Twenty capped dashboard queries on Node 26.4.0 reported median **17.66 ms**, p95 **19.17 ms**, fixture insertion **2,180 ms** during v0.2 verification. This fixture has low resource cardinality; it excludes disk I/O, HTTP, PostgreSQL/WAN, concurrent ingest and browser rendering. It is not an ingestion throughput or production latency guarantee.
+
+Final production bundles: app about 138 kB gzip, lazy ECharts chunk about 203 kB gzip, CSS about 12 kB gzip. Fonts are local assets. These are compressed artifact sizes, not render measurements.
 
 ## Unperformed boundaries
 
-No existing production server was instrumented; no external deployment, real alert channel, real AI provider, distributed failover, SSO, full OTLP protobuf/gRPC or production load certification was exercised. Browser checks are recorded manual acceptance, not a committed browser automation suite. Model-generated root-cause diagnosis is not implemented.
+No existing production server was instrumented, no external deployment provisioned, no actual geographic WAN outage or managed PostgreSQL primary failover/PITR rehearsed. No native external alert delivery, SSO, full OTLP protobuf/gRPC/log/metric transport or high-volume certification. Model-generated root-cause diagnosis and automatic remediation remain unimplemented. Native metric/log SDK retry is in memory; only the tested Collector trace path has a persistent queue.
 
-Synthetic checks record `probe_duration_ms`; a single probe is never labelled as a population p95. A regression test covers non-2xx responses with measured duration.
+Synthetic checks report `probe_duration_ms`, never a population p95. Observed trace success/AI cost remain capped evidence rather than complete traffic/SLO or financial accounting. See [production gates](MULTI_REGION.md#production-acceptance-gates).

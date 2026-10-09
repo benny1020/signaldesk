@@ -12,3 +12,5 @@ console.log(
       })),
     ),
 );
+
+console.log('POSTGRES_PASSWORD=' + randomBytes(24).toString('hex'));

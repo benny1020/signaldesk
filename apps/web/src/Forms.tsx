@@ -1,6 +1,6 @@
 import { useState, useRef, type FormEvent } from 'react';
 import type { Alert, Dashboard, RuleInput } from '../../../packages/contracts/src/index';
-import { metricNames } from '../../../packages/contracts/src/index';
+import { metricNames, dimensionKeys } from '../../../packages/contracts/src/index';
 import { Dialog, number } from './components';
 import { request, queryString } from './api';
 export function CreateForm({
@@ -25,6 +25,8 @@ export function CreateForm({
       latest: number | null;
       samples: number;
       violations: number;
+      groupCount: number;
+      noDataGroups: number;
     } | null>(null);
   const title = {
     rule: '알림 규칙 만들기',
@@ -42,6 +44,8 @@ export function CreateForm({
       name: v.name,
       service: v.service,
       environment: v.environment,
+      ...Object.fromEntries(dimensionKeys.map((key) => [key, v[key] || undefined])),
+      groupBy: v.groupBy as RuleInput['groupBy'],
       metric: v.metric as RuleInput['metric'],
       operator: v.operator as 'gt' | 'lt',
       threshold: Number(v.threshold),
@@ -60,8 +64,19 @@ export function CreateForm({
         kind === 'rule'
           ? ruleValues()
           : kind === 'incident'
-            ? { ...values(), ...(alert ? { alertId: alert.id } : {}) }
-            : values();
+            ? {
+                ...values(),
+                ...Object.fromEntries(
+                  dimensionKeys.map((key) => [key, values()[key] || undefined]),
+                ),
+                ...(alert ? { alertId: alert.id } : {}),
+              }
+            : {
+                ...values(),
+                ...Object.fromEntries(
+                  dimensionKeys.map((key) => [key, values()[key] || undefined]),
+                ),
+              };
       await request(
         '/api/' +
           { rule: 'rules', incident: 'incidents', channel: 'channels', probe: 'probes' }[kind] +
@@ -139,6 +154,48 @@ export function CreateForm({
             </label>
           </div>
         )}
+        {(kind === 'rule' || kind === 'incident' || kind === 'probe') && (
+          <>
+            <div className="form-grid">
+              {[
+                ['region', '리전'],
+                ['module', '모듈'],
+                ['cluster', '클러스터'],
+                ['namespace', '네임스페이스'],
+                ['zone', '가용 영역'],
+                ['instanceId', '인스턴스'],
+              ].map(([key, label]) => (
+                <label key={key}>
+                  {label}
+                  <input
+                    name={key}
+                    maxLength={128}
+                    defaultValue={String(alert?.[key as keyof Alert] ?? params[key] ?? '')}
+                    placeholder={
+                      kind === 'rule' || kind === 'incident'
+                        ? '미입력 시 전체 범위'
+                        : '검사 대상의 위치'
+                    }
+                  />
+                </label>
+              ))}
+            </div>
+            {kind === 'rule' && (
+              <label>
+                알림 평가 단위
+                <select name="groupBy" defaultValue="resource">
+                  <option value="resource">인스턴스별 — 각각 발생·복구</option>
+                  <option value="region">리전별 — 선택한 인스턴스 합산</option>
+                  <option value="service">서비스별 — 선택한 전체 범위 합산</option>
+                </select>
+                <small>
+                  인스턴스별 평가가 기본입니다. p95·CPU·메모리 합산 평가는 최대값, 요청량은 합계,
+                  오류율은 요청 가중값을 사용합니다.
+                </small>
+              </label>
+            )}
+          </>
+        )}
         {kind === 'rule' && (
           <>
             <div className="form-grid">
@@ -207,8 +264,9 @@ export function CreateForm({
             </button>
             {preview && (
               <div className="preview">
-                측정값 {preview.latest === null ? '없음' : number(preview.latest, 3)} · 표본{' '}
-                {preview.samples}개 · 임계치 초과 {preview.violations}개<br />
+                최대 평가 값 {preview.latest === null ? '없음' : number(preview.latest, 3)} · 표본{' '}
+                {preview.samples}개 · 현재 평가 {preview.groupCount}개 그룹 · 초과{' '}
+                {preview.violations}개 · 데이터 없음 {preview.noDataGroups}개<br />
                 <small>단일 표본 비교입니다. 지속 시간 충족 여부는 작업 실행 중 평가합니다.</small>
               </div>
             )}

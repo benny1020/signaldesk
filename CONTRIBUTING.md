@@ -7,3 +7,5 @@ Shared ingest/domain schemas are in `packages/contracts/src`. Server boundaries 
 For UI changes preserve the shared context, numeric units, data freshness, semantic keyboard controls and responsive layouts. Verify the actual screen. Use original fixtures; do not commit private hostnames, tokens, raw production logs or third-party product screenshots.
 
 Pull requests should describe the user-visible problem, resulting behavior, validation and material limits. Don't advertise a provider as connected before its runtime integration is tested. Report security issues privately as described in SECURITY.md.
+
+Shared-state changes also require `docker build -t signaldesk:local .` and `npm run test:distributed`. This creates isolated ephemeral PostgreSQL, API/worker and Collector fixtures and cleans them up. `npm run test:postgres` accepts TEST_DATABASE_URL only for a dedicated database whose name ends in `_test`; never point it at a production database. Resource identity/grouping changes must preserve region/module isolation and aggregate semantics, including equal names across deployments and disappeared/retired instances.

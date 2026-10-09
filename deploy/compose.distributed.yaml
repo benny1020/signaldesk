@@ -1,0 +1,81 @@
+# Local multi-process reference. Geographically isolated regions require the
+# managed PostgreSQL HA, regional durable queues and TLS in MULTI_REGION.md.
+x-app: &app
+  build:
+    context: ..
+  image: signaldesk:local
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  environment: &environment
+    STORAGE_BACKEND: postgres
+    PGHOST: postgres
+    PGPORT: '5432'
+    PGUSER: signaldesk
+    PGDATABASE: signaldesk
+    PGPASSWORD: ${POSTGRES_PASSWORD:?Generate POSTGRES_PASSWORD with npm run credentials}
+    AUTH_MODE: token
+    ACCESS_TOKENS: ${ACCESS_TOKENS:?Generate credentials}
+    CHANNEL_KEY: ${CHANNEL_KEY:?Generate credentials}
+    PG_POOL_SIZE: ${PG_POOL_SIZE:-10}
+    MAX_EVENTS: ${MAX_EVENTS:-1000000}
+    MAX_RESOURCES: ${MAX_RESOURCES:-20000}
+    ENVIRONMENT: production
+    COLLECT_LOCAL: 'false'
+    REQUIRE_RESOURCE_IDENTITY: 'true'
+    SEED_DEMO: 'true'
+    ALLOWED_DESTINATION_HOSTS: ${ALLOWED_DESTINATION_HOSTS:-}
+services:
+  postgres:
+    image: postgres:18-bookworm
+    environment:
+      POSTGRES_USER: signaldesk
+      POSTGRES_DB: signaldesk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Generate credentials}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U signaldesk -d signaldesk']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  api-a:
+    <<: *app
+    environment:
+      <<: *environment
+      APP_ROLE: api
+      INSTANCE_ID: api-a
+      REGION: ap-northeast-2
+  api-b:
+    <<: *app
+    environment:
+      <<: *environment
+      APP_ROLE: api
+      INSTANCE_ID: api-b
+      REGION: us-east-1
+  worker-a:
+    <<: *app
+    environment:
+      <<: *environment
+      APP_ROLE: worker
+      INSTANCE_ID: worker-a
+      REGION: control-primary
+  worker-b:
+    <<: *app
+    environment:
+      <<: *environment
+      APP_ROLE: worker
+      INSTANCE_ID: worker-b
+      REGION: control-primary
+  gateway:
+    image: nginx:1.30-alpine
+    ports: ['127.0.0.1:4321:8080']
+    volumes: ['./nginx.conf:/etc/nginx/nginx.conf:ro']
+    depends_on: [api-a, api-b]
+    restart: unless-stopped
+volumes:
+  postgres-data:

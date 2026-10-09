@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import { dimensionSchema, type ResourceSelector, type ResourceIdentity } from './resource.ts';
+export * from './resource.ts';
 export const workspaceSchema = z.enum(['demo', 'live']);
 export type Workspace = z.infer<typeof workspaceSchema>;
 export const metricNames = [
@@ -12,6 +14,8 @@ export const metricNames = [
   'ai_cost_usd',
 ] as const;
 const base = {
+  ...dimensionSchema,
+  host: z.string().max(128).optional(),
   id: z.string().min(1).max(128).optional(),
   timestamp: z.number().int().nonnegative(),
   service: z.string().min(1).max(100),
@@ -26,7 +30,6 @@ export const metricSchema = z
     kind: z.literal('metric'),
     name: z.enum(metricNames),
     value: z.number().finite().nonnegative(),
-    host: z.string().max(100).optional(),
   })
   .superRefine((m, ctx) => {
     if (['cpu_pct', 'memory_pct', 'error_pct'].includes(m.name) && m.value > 100)
@@ -87,6 +90,8 @@ export type Metric = z.infer<typeof metricSchema>;
 export type Log = z.infer<typeof logSchema>;
 export type Span = z.infer<typeof spanSchema>;
 export const ruleSchema = z.object({
+  ...dimensionSchema,
+  groupBy: z.enum(['resource', 'region', 'service']).default('resource'),
   name: z.string().min(1).max(160),
   service: z.string().min(1).max(100),
   environment: z.string().min(1).max(50).default('production'),
@@ -98,9 +103,17 @@ export const ruleSchema = z.object({
   noData: z.enum(['ignore', 'alert']).default('alert'),
   enabled: z.boolean().default(true),
 });
-export type RuleInput = z.infer<typeof ruleSchema>;
-export type Rule = RuleInput & { id: string; workspace: Workspace; pendingSince: number | null };
-export type Alert = {
+export type RuleInput = Omit<z.infer<typeof ruleSchema>, 'groupBy'> & {
+  groupBy?: 'resource' | 'region' | 'service';
+};
+export type Rule = RuleInput & {
+  id: string;
+  workspace: Workspace;
+  pendingSince: number | null;
+  revision?: number;
+};
+export type Alert = ResourceSelector & {
+  groupKey?: string;
   id: string;
   workspace: Workspace;
   ruleId: string;
@@ -116,7 +129,7 @@ export type Alert = {
   acknowledged: boolean;
   snoozedUntil: number;
 };
-export type Incident = {
+export type Incident = ResourceSelector & {
   id: string;
   workspace: Workspace;
   title: string;
@@ -130,7 +143,7 @@ export type Incident = {
   updatedAt: number;
   timeline: { id: string; time: number; text: string; actor: string }[];
 };
-export type QueryScope = {
+export type QueryScope = ResourceSelector & {
   workspace: Workspace;
   from: number;
   to: number;
@@ -152,15 +165,42 @@ export type ServiceSummary = {
   errorPct: number | null;
   latency: number | null;
   lastSeen: number;
+  instances: number;
+  regions: string[];
+  modules: string[];
   status: 'healthy' | 'degraded' | 'unknown';
 };
-export type HostSummary = {
+export type HostSummary = ResourceIdentity & {
+  id: string;
   name: string;
   cpu: number | null;
   memory: number | null;
   lastSeen: number;
 };
+export type ResourceSummary = ResourceIdentity & {
+  id: string;
+  host?: string;
+  firstSeen: number;
+  lastSeen: number;
+  retired: boolean;
+  requestRate: number | null;
+  errorPct: number | null;
+  latency: number | null;
+  status: 'healthy' | 'degraded' | 'unknown' | 'retired';
+};
+export type RuleState = {
+  id: string;
+  workspace: Workspace;
+  ruleId: string;
+  groupKey: string;
+  resource: ResourceSelector;
+  pendingSince: number | null;
+  lastSeen: number;
+  configuration?: string;
+};
 export type Dashboard = {
+  resources: ResourceSummary[];
+  inventoryTruncated: boolean;
   services: ServiceSummary[];
   hosts: HostSummary[];
   series: Record<string, Series>;

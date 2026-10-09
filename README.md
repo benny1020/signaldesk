@@ -19,18 +19,19 @@ Servers · APIs · Logs · Traces · Alerts · Incidents · AI workloads
 
 SignalDesk is a self-hosted monitoring and incident workspace for engineers who need to move from a service symptom to logs, a request trace, an alert, and an incident timeline without losing context. It pairs a dense, readable interface with a working ingestion API, persistent storage and background evaluation.
 
-**Release status: v0.1 single-node baseline.** Demo fixtures and real telemetry are separate workspaces. The bundled SQLite adapter is for local evaluation and modest single-instance workloads. Distributed storage, full OTLP transport compatibility, SSO and model-driven diagnosis are future work, not connected integrations.
+**Release status: v0.2 resource-aware, multi-process baseline.** Identify services by environment, module, region, zone, cluster, namespace and instance. Run multiple API and worker processes against shared PostgreSQL, or use SQLite for local evaluation. Demo and Live remain separate. The reference deployment and failure tests run locally; managed database failover and geographically distributed production capacity are not certified.
 
 ## Features
 
 | Workspace       | Implemented behavior                                                                                                                                        |
 | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deployments     | Regional comparison, per-resource inventory, six shared deployment filters, instance drilldown and explicit retirement/resume                               |
 | Overview        | Shared environment/service/time filters, request rate, request-weighted error percentage, maximum service p95, incident context and actionable service rows |
 | Services & APIs | RED measurements, freshness state, service drawer and related log/trace navigation; parent/child span-derived service connections                           |
 | Infrastructure  | Real local CPU and OS memory collection every 5 seconds, timestamped host measurements; JSON ingestion for external hosts                                   |
 | Logs            | Message/level search, virtualized rows, stable keyset pagination, JSON export, attributes and trace linking                                                 |
 | Traces          | Indexed trace lookup, parent/child waterfall, duration, status and span attributes                                                                          |
-| Alerts          | Validated service/environment rules, threshold preview, sustained duration, explicit no-data policy, acknowledgment and snooze                              |
+| Alerts          | Resource/region/service rule groups, group-aware preview, independent duration/recovery/no-data, acknowledgment and snooze                                  |
 | Notifications   | Encrypted HTTPS destinations, persisted outbox, bounded exponential retries, delivery history and manual failed-job retry                                   |
 | Incidents       | Independent incident states, owners, linked alert and persistent investigation notes/timeline                                                               |
 | Analytics       | Observed root-span success rate, normalized error groups and service/time error heatmap; sample limits are visible                                          |
@@ -40,9 +41,10 @@ SignalDesk is a self-hosted monitoring and incident workspace for engineers who 
 Charts use modular **Apache ECharts 6.1**, with zoom, series toggles, explicit units and a numeric table alternative. Logs use **TanStack Virtual** and paged server queries. React Query coordinates polling and invalidation. Reduced motion, native modal focus handling and small-screen layouts are included.
 
 <details>
-<summary>More screens: infrastructure, AI workloads and mobile</summary>
+<summary>More screens: infrastructure, cross-region trace, AI workloads and mobile</summary>
 
 ![Infrastructure signals](docs/screenshots/infrastructure.png)
+![Cross-region request waterfall](docs/screenshots/cross-region-trace.png)
 ![AI workload evidence](docs/screenshots/ai-workloads.png)
 ![Mobile overview](docs/screenshots/mobile.png)
 
@@ -79,7 +81,22 @@ npm run dev
 
 Web: http://127.0.0.1:5178. API: http://127.0.0.1:4319. The `.env` file is loaded by the Node entrypoint. If you change the API port, update the development proxy in `apps/web/vite.config.ts`.
 
-### Docker
+### Shared PostgreSQL deployment
+
+```bash
+npm run --silent credentials > .env
+docker compose --env-file .env -f deploy/compose.distributed.yaml up --build -d
+```
+
+Open **http://127.0.0.1:4321** and enter the admin token from `.env`. This starts PostgreSQL, two API replicas, two workers and a load balancer. All writers use the same database. Worker ownership uses database session locks; alert and outbox publication is transactional. These containers run on one host; their region labels demonstrate resource scoping.
+
+For a real regional deployment, use managed PostgreSQL HA, regional Collector persistent volumes, TLS and measured connection/capacity budgets. [Multi-region design and failure behavior](docs/MULTI_REGION.md) gives the deployment boundary and acceptance gates.
+
+![Regional comparison and deployment inventory](docs/screenshots/deployments.png)
+
+![Region request-rate comparison](docs/screenshots/region-charts.png)
+
+### Single-process Docker evaluation
 
 ```bash
 npm run --silent credentials > .env
@@ -105,6 +122,11 @@ await fetch('http://127.0.0.1:4319/api/ingest', {
         timestamp: Date.now(),
         service: 'orders-api',
         environment: 'production',
+        module: 'api',
+        region: 'ap-northeast-2',
+        cluster: 'commerce-prod',
+        namespace: 'orders',
+        instanceId: 'orders-pod-1',
         name: 'error_pct',
         value: 0.4,
       },
@@ -113,7 +135,7 @@ await fetch('http://127.0.0.1:4319/api/ingest', {
 });
 ```
 
-In token mode include `Authorization: Bearer <ingest-token>`. Never put a token in a URL. The lightweight [producer](packages/sdk/index.js) adds stable IDs, bounded batches, timeouts, retries and queue/drop counters. It is repository source, not a published npm package. Flush it from your application lifecycle; it has no hidden timer or unbounded queue.
+In token mode include `Authorization: Bearer <ingest-token>`. Never put a token in a URL. The lightweight [producer](packages/sdk/index.js) adds stable IDs, bounded batches, timeouts, retries and queue/drop counters. It is repository source, not a published npm package. Set its `resource` defaults once and flush from the application lifecycle. Its retry queue is bounded **in memory**; it does not survive producer restarts. The supplied regional Collector configuration persists **traces** to disk and exports gzip OTLP/HTTP JSON.
 
 [API reference](docs/API.md) includes all operations, the trace bridge, roles and examples. **`/api/v1/traces` accepts a bounded subset of OTLP/HTTP JSON traces. It does not accept protobuf, metrics, logs or gRPC.** Do not point a default protobuf OTLP exporter at it and expect full compatibility.
 
@@ -121,21 +143,19 @@ In token mode include `Authorization: Bearer <ingest-token>`. Never put a token 
 
 ```mermaid
 flowchart LR
-  Producers[Service producers / local collector] --> API[Validation and scoped access]
-  Web[React operations UI] --> API
-  API --> Port[Async-capable TelemetryStore port]
-  Port --> SQLite[Bundled SQLite WAL adapter]
-  Worker[Rule / probe / delivery worker] --> Port
-  Worker --> Control[Rules · alerts · incidents · audit]
-  API --> Control
-  Control --> DB[SQLite control database]
-  Control --> Outbox[Persistent notification outbox]
-  Outbox --> Destinations[HTTPS webhooks]
+  Regions[Regional services: module / instance identity] --> Collector[Regional Collector: persistent trace queue]
+  Regions --> Native[Native metric / log producer]
+  Collector --> APIs[Load balancer + API replicas]
+  Native --> APIs
+  Web[React operations UI] --> APIs
+  APIs --> PG[Shared PostgreSQL: telemetry + control + outbox]
+  Workers[Worker replicas: per-task database locks] --> PG
+  Workers --> HTTPS[HTTPS probes / webhook delivery]
 ```
 
-`createApp(controlStore, config, telemetryAdapter)` and `Engine(..., telemetryAdapter)` accept async-capable adapters. Contracts live independently from the UI. A contract test exercises ingestion, query and alert evaluation through an asynchronous adapter. The bundled adapter is the only shipped telemetry engine; Prometheus, Loki, Tempo and ClickHouse adapters are not implemented yet.
+`TelemetryStore` defines resource-scoped reads, indexed latest metrics and inventory. `ControlStore` owns rules, independent group states, incidents, audit and delivery transactions. Both PostgreSQL and SQLite implement `Storage`; APIs and workers use the same contracts. Prometheus, Loki, Tempo and ClickHouse adapters remain planned.
 
-The next scale boundary is concrete: remote telemetry adapter, shared transactional control storage, scheduler leases, durable queue, distributed aggregation and adapter conformance tests. Adding replicas to the current SQLite instance is unsupported. See [architecture](docs/ARCHITECTURE.md) and [roadmap](docs/ROADMAP.md).
+Resource identity separates monitored deployments from platform replicas. A worker evaluates each rule group independently, publishes one active alert per group and preserves concurrent acknowledgments/incident notes. PostgreSQL session-lock loss fences the old worker's database operations. SQLite supports one combined process; a shared SQLite volume is not a replica strategy. See [architecture](docs/ARCHITECTURE.md).
 
 ## AI monitoring
 
@@ -153,23 +173,32 @@ npm run check
 npm audit --audit-level=high
 ```
 
-The suite covers atomic/idempotent ingestion, privacy stripping, role/workspace access, rule duration/no-data/recovery, snooze and delivery retries, timestamp-safe paging, persistence, asynchronous storage injection, exact trace lookup, OTLP JSON mapping and producer backpressure. GitHub Actions runs type checks, tests, a production build, dependency audit and authenticated Docker smoke checks.
+The suite covers atomic/idempotent ingestion, privacy, roles, resource isolation, weighted aggregates, independent group state, history, cardinality limits, gzip body limits and producer backpressure. CI additionally runs real PostgreSQL concurrency/lock-loss tests and four-process Docker acceptance, including a Collector disk queue through outage/restart.
+
+```bash
+docker build -t signaldesk:local .
+npm run test:distributed
+```
+
+For new installations only: generating `.env` again rotates credentials and the channel key.
+
+The distributed test creates isolated PostgreSQL and application containers, then removes its containers, volumes and temporary credentials.
 
 Manual browser acceptance covers the correlated navigation, alert actions, rule preview/create, incident notes/status, numeric chart view, AI workspace, real local collection and desktop/mobile rendering. [Verification record](docs/VERIFICATION.md) states what was actually executed and any remaining limits.
 
 ## Operational limits
 
-- One API process owns the worker. No high availability or horizontal replication.
-- Seven-day retention; default 1,000,000-event ceiling, configurable with `MAX_EVENTS`. Capacity exhaustion rejects ingestion explicitly. Control entities also have limits.
+- PostgreSQL supports multiple API/worker processes; a primary database remains the write authority. Regional active-active databases and managed HA failover are not implemented by the app.
+- Seven-day retention; default 1,000,000-event ceiling, configurable with `MAX_EVENTS`. Capacity exhaustion rejects ingestion explicitly. Resource registry defaults to 20,000 identities/workspace (`MAX_RESOURCES`). Control entities also have limits.
 - Dashboard queries cap at 10,000 metric points, 300 logs and 1,000 spans. Graphs aggregate to approximately 120 time buckets. Logs can page further. AI/analytics are observed samples, not complete accounting or SLO compliance.
-- Alert evaluation uses the latest point for one service/environment/metric. Data older than two minutes is no-data. It is not a PromQL range evaluator.
+- Rules default to independent resource groups. Region/service aggregation sums request rates, uses request-weighted error rates and the maximum instance p95. This maximum is **not** a global population p95. Samples older than two minutes are no-data; exceeding evaluation bounds fails explicitly. Rules are not PromQL.
 - Generic HTTPS webhook JSON, not a native Slack/Telegram/PagerDuty payload adapter. Delivery is at-least-once; receivers should deduplicate `deliveryId`. No credentials or destinations are preconfigured.
 - Token roles are a deployable baseline; SSO, user provisioning and organization membership are future work. Use HTTPS and a reverse proxy for remote access.
 - Built-in redaction is a baseline, not a universal PII detector. Redact arbitrary sensitive log content before ingestion.
 
 ## Documentation
 
-[Product and UX](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [Operations](docs/OPERATIONS.md) · [Research](docs/RESEARCH.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+[Product and UX](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [Multi-region](docs/MULTI_REGION.md) · [API](docs/API.md) · [Operations](docs/OPERATIONS.md) · [Research](docs/RESEARCH.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ## License
 

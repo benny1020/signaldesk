@@ -1,0 +1,54 @@
+# Collector contrib v0.162.0. Only traces are exported: the bridge does not
+# advertise OTLP metrics/logs support. Bind this receiver on a private network.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 128
+    spike_limit_mib: 32
+  resource/region:
+    attributes:
+      - key: cloud.region
+        value: ${env:REGION}
+        action: insert
+      - key: k8s.cluster.name
+        value: ${env:CLUSTER}
+        action: insert
+  batch:
+    timeout: 1s
+    send_batch_size: 256
+    send_batch_max_size: 512
+exporters:
+  otlp_http/signaldesk:
+    traces_endpoint: ${env:SIGNALDESK_TRACES_ENDPOINT}
+    encoding: json
+    timeout: 10s
+    headers:
+      Authorization: Bearer ${env:SIGNALDESK_INGEST_TOKEN}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+      max_interval: 30s
+      max_elapsed_time: 0s
+    sending_queue:
+      enabled: true
+      num_consumers: 4
+      queue_size: 10000
+      storage: file_storage
+extensions:
+  file_storage:
+    directory: /var/lib/otelcol/queue
+    create_directory: true
+    fsync: true
+    max_size: 268435456
+service:
+  extensions: [file_storage]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/region, batch]
+      exporters: [otlp_http/signaldesk]

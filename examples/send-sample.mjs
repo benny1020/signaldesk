@@ -2,6 +2,13 @@ import { SignalDeskClient } from '../packages/sdk/index.js';
 const client = new SignalDeskClient({
   endpoint: process.env.SIGNALDESK_URL,
   token: process.env.SIGNALDESK_TOKEN,
+  resource: {
+    module: 'api',
+    region: process.env.REGION ?? 'example-local',
+    instanceId: 'example-orders-1',
+    cluster: 'example',
+    namespace: 'examples',
+  },
   onError: (e) => console.error(e.message),
 });
 const timestamp = Date.now(),

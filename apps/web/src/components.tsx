@@ -151,7 +151,7 @@ export function ServiceTable({
             {!compact && <th>환경</th>}
             <th className="numeric">요청 / 초</th>
             <th className="numeric">오류율</th>
-            <th className="numeric">p95</th>
+            <th className="numeric">최대 p95</th>
             <th />
           </tr>
         </thead>
@@ -163,7 +163,10 @@ export function ServiceTable({
                   <span className="service-mark">{s.name.slice(0, 2).toUpperCase()}</span>
                   <span>
                     {s.name}
-                    {compact && <small>{s.environment}</small>}
+                    <small>
+                      {s.instances}개 인스턴스 · {s.regions.length}개 리전
+                      {compact ? ' · ' + s.environment : ''}
+                    </small>
                   </span>
                 </button>
               </td>
@@ -202,9 +205,14 @@ export function Hosts({ hosts, now }: { hosts: HostSummary[]; now: number }) {
   return hosts.length ? (
     <div className="host-list">
       {hosts.map((h) => (
-        <div className="host-row" key={h.name}>
+        <div className="host-row" key={h.id}>
           <div>
-            <strong>{h.name}</strong>
+            <strong>
+              {h.name}
+              <small>
+                {h.region} · {h.cluster}
+              </small>
+            </strong>
             <small>
               {now - h.lastSeen > 120000 ? '최근 데이터 없음' : '최근 수집 ' + time(h.lastSeen)}
             </small>
@@ -379,7 +387,7 @@ export function Kpis({ data }: { data: Dashboard }) {
         </strong>
       </div>
       <div>
-        <span>최대 서비스 p95</span>
+        <span>최대 인스턴스 p95</span>
         <strong>
           {number(latency, 0)}
           <small>ms</small>

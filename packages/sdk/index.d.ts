@@ -1,7 +1,8 @@
-import type { TelemetryEvent, Workspace } from '../contracts/src/index';
+import type { TelemetryEvent, Workspace, ResourceSelector } from '../contracts/src/index';
 export class SignalDeskClient {
   constructor(options?: {
     endpoint?: string;
+    resource?: ResourceSelector;
     token?: string;
     workspace?: Workspace;
     batchSize?: number;

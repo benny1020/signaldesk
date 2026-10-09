@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import type {
   Dashboard,
+  ResourceSummary,
   Log,
   Span,
   Alert,
@@ -44,12 +45,17 @@ export type Selection =
   | { type: 'log'; log: Log }
   | { type: 'trace'; id: string }
   | { type: 'incident'; incident: Incident }
-  | { type: 'briefing'; service?: string; environment?: string };
+  | ({
+      type: 'briefing';
+      service?: string;
+      environment?: string;
+    } & import('../../../packages/contracts/src/index').ResourceSelector);
 export type PageProps = {
   data: Dashboard;
   params: Params;
   select: (s: Selection) => void;
   navigate: (page: string, service?: string) => void;
+  focusResource: (r: ResourceSummary, page?: string) => void;
   mutate: (path: string, body: unknown, method?: string) => Promise<unknown>;
   openForm: (kind: 'rule' | 'incident' | 'channel' | 'probe', alert?: Alert) => void;
   paused: boolean;
@@ -265,7 +271,9 @@ export function Infrastructure(p: PageProps) {
           <select aria-label="호스트 추이" value={host} onChange={(e) => setHost(e.target.value)}>
             <option value="">모든 호스트 (최대 4개 비교)</option>
             {p.data.hosts.map((h) => (
-              <option key={h.name}>{h.name}</option>
+              <option key={h.id} value={h.id}>
+                {h.name} / {h.region}
+              </option>
             ))}
           </select>
         </label>
@@ -540,7 +548,8 @@ export function Alerts(p: PageProps) {
                     <Badge value={a.status} />
                   </div>
                   <p>
-                    {a.service || '전체 서비스'} · {a.environment} ·{' '}
+                    {a.service || '전체 서비스'} · {a.environment} · {a.region ?? '전체 리전'} ·{' '}
+                    {a.instanceId ?? '그룹'} ·{' '}
                     {a.reason === 'no_data'
                       ? '최근 2분간 데이터 없음'
                       : '측정값 ' + number(a.value, 2)}{' '}
@@ -627,7 +636,14 @@ export function Alerts(p: PageProps) {
                     </td>
                     <td>
                       {r.service || '전체 서비스'}
-                      <small>{r.environment}</small>
+                      <small>
+                        {r.environment} · {r.region ?? '모든 리전'} · {r.module ?? '모든 모듈'} ·{' '}
+                        {r.groupBy === 'service'
+                          ? '서비스 합산'
+                          : r.groupBy === 'region'
+                            ? '리전별'
+                            : '인스턴스별'}
+                      </small>
                     </td>
                     <td className="mono">
                       {r.metric} {r.operator === 'gt' ? '>' : '<'} {r.threshold}
@@ -701,6 +717,16 @@ export type Connections = {
     workerHeartbeat: number;
     workerError: string | null;
     retentionDays: number;
+    backend: string;
+    processRole: string;
+    resourceCapacity: number;
+    workers: {
+      id: string;
+      region?: string;
+      lastSeen: number;
+      heartbeat: number;
+      error: string | null;
+    }[];
   };
   audit: { time: number; actor: string; action: string; target: string }[];
 };
@@ -786,7 +812,7 @@ export function Incidents(p: PageProps) {
             </div>
             <h3>{i.title}</h3>
             <p>
-              {i.service} · {i.environment}
+              {i.service} · {i.environment} · {i.region ?? '전체 리전'} · {i.instanceId ?? '그룹'}
             </p>
             <footer>
               <span>{i.owner || '담당자 미지정'}</span>
@@ -1054,9 +1080,13 @@ export function ConnectionsPage(p: PageProps) {
   return (
     <>
       <div className="two-column">
-        <Panel title="수집 상태" meta="전체 로컬 저장소의 상태">
+        <Panel title="수집 상태" meta="공유 저장소 · API와 작업자의 상태">
           {q.data && (
             <dl className="detail-list">
+              <dt>저장 엔진 / 역할</dt>
+              <dd>
+                {q.data.health.backend} / {q.data.health.processRole}
+              </dd>
               <dt>저장 이벤트</dt>
               <dd>
                 {number(q.data.health.storedEvents, 0)} / {number(q.data.health.capacity, 0)}
@@ -1079,15 +1109,54 @@ export function ConnectionsPage(p: PageProps) {
         </Panel>
         <Panel title="서비스 연결" meta="JSON 수집 API · OTLP HTTP JSON 트레이스">
           <p className="panel-copy">
-            서비스·환경·타임스탬프를 포함해 데이터를 전송하세요. Live에서 외부 서비스와 로컬
-            호스트를 함께 봅니다.
+            서비스·환경·리전·모듈·인스턴스를 포함해 데이터를 전송하세요. 배포 단위별 오류를 구분하고
+            같은 요청의 트레이스는 리전 간에도 연결합니다.
           </p>
-          <pre className="code-block">{`POST /api/ingest\n{ "workspace": "live", "events": [{\n  "kind": "metric", "name": "error_pct",\n  "value": 0.2, "service": "orders-api",\n  "environment": "production",\n  "timestamp": ${Date.now()}\n}] }`}</pre>
+          <pre className="code-block">{`POST /api/ingest\n{ "workspace": "live", "events": [{\n  "kind": "metric", "name": "error_pct",\n  "value": 0.2, "service": "orders-api",\n  "environment": "production",\n  "region": "ap-northeast-2", "module": "api",\n  "instanceId": "orders-pod-1",\n  "timestamp": ${Date.now()}\n}] }`}</pre>
           <small className="muted">
             OTLP JSON: /api/v1/traces?workspace=live · protobuf/gRPC는 지원하지 않습니다.
           </small>
         </Panel>
       </div>
+      {live && (
+        <Panel title="작업자 인스턴스" meta="30초 이상 하트비트가 없으면 연결 지연으로 표시합니다.">
+          <div className="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>인스턴스</th>
+                  <th>리전</th>
+                  <th>상태</th>
+                  <th>최근 실행</th>
+                  <th>오류</th>
+                </tr>
+              </thead>
+              <tbody>
+                {q.data?.health.workers.map((w) => (
+                  <tr key={w.id}>
+                    <td className="mono">{w.id}</td>
+                    <td>{w.region ?? 'unknown'}</td>
+                    <td>
+                      <Badge
+                        value={
+                          Date.now() - w.lastSeen < 30000
+                            ? w.error
+                              ? 'degraded'
+                              : 'healthy'
+                            : 'unknown'
+                        }
+                      />
+                    </td>
+                    <td>{w.heartbeat ? time(w.heartbeat) : '실행 대기'}</td>
+                    <td>{w.error ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {!q.data?.health.workers.length && <Empty>아직 보고된 작업자가 없습니다.</Empty>}
+        </Panel>
+      )}
       <Panel
         title="알림 채널"
         meta="HTTPS Webhook · 암호화 저장 · 5회까지 재시도"

@@ -1,12 +1,13 @@
-import { Store } from './store.ts';
+import type { Storage } from './storage.ts';
+import { resourceKey } from '../../../packages/contracts/src/index.ts';
 import type {
   TelemetryEvent,
   Rule,
   Alert,
   Incident,
 } from '../../../packages/contracts/src/index.ts';
-export function seedDemo(store: Store, now = Date.now()) {
-  if (store.db.prepare("SELECT value FROM settings WHERE key='demoNow'").get()) return;
+export async function seedDemo(store: Storage, now = Date.now()) {
+  if (await store.setting('demoNow')) return;
   const services = [
     'api-gateway',
     'checkout-api',
@@ -16,11 +17,11 @@ export function seedDemo(store: Store, now = Date.now()) {
     'ai-assistant',
   ];
   const events: TelemetryEvent[] = [];
-  for (let i = 0; i < 96; i++) {
-    const timestamp = now - (95 - i) * 30000;
+  for (let i = 0; i < 64; i++) {
+    const timestamp = now - (63 - i) * 45000;
     for (let j = 0; j < services.length; j++) {
       const service = services[j],
-        incident = j === 1 && i > 65;
+        incident = j === 1 && i > 43;
       const rates = [240, 83, 41, 126, 67, 12],
         rate = rates[j] * (0.9 + 0.13 * Math.sin(i * 0.3 + j));
       for (const [name, value] of [
@@ -48,7 +49,7 @@ export function seedDemo(store: Store, now = Date.now()) {
     }
     for (let j = 0; j < 3; j++)
       for (const [name, value] of [
-        ['cpu_pct', j === 1 && i > 65 ? 78 + Math.sin(i) * 6 : 28 + j * 12 + Math.sin(i * 0.3) * 8],
+        ['cpu_pct', j === 1 && i > 43 ? 78 + Math.sin(i) * 6 : 28 + j * 12 + Math.sin(i * 0.3) * 8],
         ['memory_pct', 46 + j * 11 + Math.sin(i * 0.1) * 2],
       ] as const)
         events.push({
@@ -140,7 +141,67 @@ export function seedDemo(store: Store, now = Date.now()) {
           attributes: { 'db.system': k === 1 ? 'postgresql' : '' },
         });
   }
-  store.append('demo', events);
+  const regions = ['ap-northeast-2', 'us-east-1', 'eu-west-1'];
+  const resource = (service: string, region: string, replica: number) => ({
+    module: (
+      {
+        'api-gateway': 'edge',
+        'checkout-api': 'checkout',
+        'payment-worker': 'payments',
+        'catalog-api': 'catalog',
+        'auth-service': 'identity',
+        'ai-assistant': 'assistant',
+        infrastructure: 'platform',
+      } as Record<string, string>
+    )[service],
+    region,
+    zone: region + (replica === 0 ? 'a' : 'b'),
+    cluster: 'prod-' + region,
+    namespace: service === 'ai-assistant' ? 'ai' : 'commerce',
+    instanceId: service + '-' + (replica + 1),
+  });
+  const expanded: TelemetryEvent[] = [];
+  for (const e of events) {
+    if (e.kind === 'metric')
+      for (const [index, region] of regions.entries())
+        for (let replica = 0; replica < (e.host ? 1 : 2); replica++) {
+          const r = {
+              ...resource(e.service, region, replica),
+              ...(e.host ? { instanceId: e.host } : {}),
+            },
+            unhealthy =
+              e.service === 'checkout-api' &&
+              index === 0 &&
+              replica === 0 &&
+              e.timestamp > now - 15 * 60000;
+          expanded.push({
+            ...e,
+            ...r,
+            id: e.id + '-' + index + '-' + replica,
+            value:
+              e.name === 'request_rate'
+                ? e.value * [0.5, 0.3, 0.2][index]
+                : e.name === 'error_pct' && !unhealthy
+                  ? 0.12
+                  : e.name === 'latency_p95_ms' && e.service === 'checkout-api' && !unhealthy
+                    ? 180
+                    : e.value,
+          });
+        }
+    else {
+      const index = Number(e.traceId?.match(/\d+$/)?.[0] ?? 0),
+        sourceRegion = Math.floor(index / 6) % 3,
+        region =
+          regions[
+            e.kind === 'span' && e.name === 'payment.authorize'
+              ? (sourceRegion + 1) % 3
+              : sourceRegion
+          ],
+        replica = Math.floor(index / 18) % 2;
+      expanded.push({ ...e, ...resource(e.service, region, replica) });
+    }
+  }
+  await store.append('demo', expanded);
   const rule: Rule = {
     id: 'demo-checkout-rule',
     workspace: 'demo',
@@ -155,13 +216,21 @@ export function seedDemo(store: Store, now = Date.now()) {
     noData: 'alert',
     enabled: true,
     pendingSince: now - 840000,
+    groupBy: 'resource',
+    module: 'checkout',
   };
-  store.put('rule', rule);
+  await store.put('rule', rule);
   const alert: Alert = {
     id: 'demo-alert-01',
     workspace: 'demo',
     ruleId: rule.id,
     title: rule.name,
+    ...resource('checkout-api', 'ap-northeast-2', 0),
+    groupKey: resourceKey({
+      service: rule.service,
+      environment: rule.environment,
+      ...resource('checkout-api', 'ap-northeast-2', 0),
+    }),
     service: rule.service,
     environment: rule.environment,
     severity: 'critical',
@@ -173,11 +242,12 @@ export function seedDemo(store: Store, now = Date.now()) {
     acknowledged: false,
     snoozedUntil: 0,
   };
-  store.put('alert', alert);
+  await store.put('alert', alert);
   const incident: Incident = {
     id: 'demo-incident-01',
     workspace: 'demo',
     title: 'Checkout 응답 지연 및 오류 증가',
+    ...resource('checkout-api', 'ap-northeast-2', 0),
     service: 'checkout-api',
     environment: 'production',
     severity: 'critical',
@@ -202,6 +272,7 @@ export function seedDemo(store: Store, now = Date.now()) {
       },
     ],
   };
-  store.put('incident', incident);
-  store.db.prepare("INSERT INTO settings VALUES('demoNow',?)").run(String(now));
+  await store.put('incident', incident);
+  await store.setSetting('demoNow', String(now));
+  await store.setSetting('demoRevision', '2');
 }
