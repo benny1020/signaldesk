@@ -188,6 +188,8 @@ Manual browser acceptance covers the correlated navigation, alert actions, rule 
 
 ## Operational limits
 
+The [2026-10-09 OSS comparison review](docs/OSS_COMPARISON_REVIEW.md) identifies seven unresolved correctness and investigation findings, plus feature and UX gaps. Passing CI does not establish parity with mature observability products or production readiness.
+
 - PostgreSQL supports multiple API/worker processes; a primary database remains the write authority. Regional active-active databases and managed HA failover are not implemented by the app.
 - Seven-day retention; default 1,000,000-event ceiling, configurable with `MAX_EVENTS`. Capacity exhaustion rejects ingestion explicitly. Resource registry defaults to 20,000 identities/workspace (`MAX_RESOURCES`). Control entities also have limits.
 - Dashboard queries cap at 10,000 metric points, 300 logs and 1,000 spans. Graphs aggregate to approximately 120 time buckets. Logs can page further. AI/analytics are observed samples, not complete accounting or SLO compliance.
@@ -198,7 +200,7 @@ Manual browser acceptance covers the correlated navigation, alert actions, rule 
 
 ## Documentation
 
-[Product and UX](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [Multi-region](docs/MULTI_REGION.md) · [API](docs/API.md) · [Operations](docs/OPERATIONS.md) · [Research](docs/RESEARCH.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+[Product and UX](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [Multi-region](docs/MULTI_REGION.md) · [API](docs/API.md) · [Operations](docs/OPERATIONS.md) · [Research](docs/RESEARCH.md) · [OSS comparison review](docs/OSS_COMPARISON_REVIEW.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ## License
 

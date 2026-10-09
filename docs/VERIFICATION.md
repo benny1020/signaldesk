@@ -47,3 +47,11 @@ Final production bundles: app about 138 kB gzip, lazy ECharts chunk about 203 kB
 No existing production server was instrumented, no external deployment provisioned, no actual geographic WAN outage or managed PostgreSQL primary failover/PITR rehearsed. No native external alert delivery, SSO, full OTLP protobuf/gRPC/log/metric transport or high-volume certification. Model-generated root-cause diagnosis and automatic remediation remain unimplemented. Native metric/log SDK retry is in memory; only the tested Collector trace path has a persistent queue.
 
 Synthetic checks report `probe_duration_ms`, never a population p95. Observed trace success/AI cost remain capped evidence rather than complete traffic/SLO or financial accounting. See [production gates](MULTI_REGION.md#production-acceptance-gates).
+
+## 2026-10-09 review counterexamples
+
+The [OSS comparison review](OSS_COMPARISON_REVIEW.md) inspected eight pinned repositories and 33 selected source/license files, public UX references and the actual SignalDesk desktop UI. The exact base `fbfbdeec79417d4d9ab5759f9a7b9c5042920c0d` CI run [37878061092](https://github.com/benny1020/signaldesk/actions/runs/37878061092) was rechecked as successful.
+
+Seven open findings were identified: incomplete long-window heatmaps; cross-region child service context loss; trace-only host-labelled services missing from the service list; shared gateway IP quotas including health; log filter/history mismatch; child-only traces hidden; and cross-service error grouping. The first, second and fifth were reproduced in the browser; the third, fourth and sixth use actual isolated server functions; the seventh uses source algorithm replay. See [reproduction evidence](review/reproduction-evidence.json) and [source manifest](review/upstream-sources.json).
+
+These cases are not covered by the existing acceptance claims and have not been repaired in this review. No production telemetry was reset and no external alert/model was called. The existing mobile screenshot was inspected, but the current browser viewport override returned 1280px after a requested 390px, so a fresh mobile acceptance is unperformed. Upstream deployments, comparative load benchmarks and new production failover exercises were not run.

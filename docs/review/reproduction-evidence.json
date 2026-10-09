@@ -1,0 +1,102 @@
+{
+  "signaldesk_base": "fbfbdeec79417d4d9ab5759f9a7b9c5042920c0d",
+  "date": "2026-10-09",
+  "environment": {
+    "node": "26.4.0",
+    "ui_viewport": "1280x720",
+    "workspace": "demo",
+    "data_clock": "2026-10-09T03:05:50.618Z",
+    "production_data_modified": false
+  },
+  "observations": [
+    {
+      "id": "R1",
+      "method": "Browser + read-only dashboard API",
+      "windowUTC": ["2026-10-08T03:05:50.618Z", "2026-10-09T03:05:50.618Z"],
+      "errorLogs": 14,
+      "heatmapEndsUTC": "2026-10-08T07:05:00Z",
+      "errorLogsInsideRenderedHeatmap": 0,
+      "apiTruncated": false,
+      "screenshot": "../screenshots/review/heatmap-24h.png"
+    },
+    {
+      "id": "R2",
+      "method": "Browser",
+      "initialScope": {
+        "service": "checkout-api",
+        "module": "checkout",
+        "region": "ap-northeast-2"
+      },
+      "traceId": "trace-000001",
+      "spans": 4,
+      "regions": 2,
+      "action": "Click payment-worker in trace waterfall",
+      "result": "payment-worker drawer retains module checkout and shows no data",
+      "screenshot": "../screenshots/review/cross-region-context-loss.png"
+    },
+    {
+      "id": "R3",
+      "method": "Actual Store(:memory:) + dashboard()",
+      "input": "One span for checkout-api with host node-01 and full resource identity; no gauges",
+      "resources": 1,
+      "spans": 1,
+      "services": 0,
+      "hosts": 1
+    },
+    {
+      "id": "R4",
+      "method": "Actual createApp()/app.inject() in isolated Store(:memory:)",
+      "gatewayAddress": "172.20.0.10",
+      "distinctForwardedClientAddresses": 200,
+      "bootstrapRequests": 241,
+      "statuses": {
+        "200": 240,
+        "429": 1
+      },
+      "healthAfterBurst": 429,
+      "note": "Current local Fastify limiter; one API process. Two-process deployment has separate budgets, not a shared limiter."
+    },
+    {
+      "id": "R5",
+      "method": "Browser back navigation",
+      "beforeBackURL": "?workspace=demo&page=logs&range=1440&level=warn&region=ap-northeast-2",
+      "afterBackURL": "?workspace=demo&page=logs&range=1440&level=error",
+      "levelControlAfterBack": "warn",
+      "renderedLogLevel": "warn"
+    },
+    {
+      "id": "R6",
+      "method": "Actual Store(:memory:) + dashboard(); exact frontend root predicate inspection",
+      "input": "One child span with parentSpanId for selected service/resource",
+      "returnedSpans": 1,
+      "renderableTraceListRows": 0
+    },
+    {
+      "id": "R7",
+      "method": "Source algorithm replay; not whole UI integration",
+      "input": [
+        {
+          "service": "checkout-api",
+          "message": "request 123 timeout"
+        },
+        {
+          "service": "auth-service",
+          "message": "request 456 timeout"
+        }
+      ],
+      "output": [
+        {
+          "service": "checkout-api",
+          "normalizedMessage": "request # timeout",
+          "count": 2
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "No upstream deployment or comparative load benchmark was executed.",
+    "Current browser viewport override returned 1280px even when 390px was requested; a new mobile acceptance is not claimed. Existing mobile.png was inspected separately.",
+    "Prior exact-head CI was rechecked as successful; it does not cover these new cases.",
+    "This review leaves application findings unresolved."
+  ]
+}

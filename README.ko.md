@@ -64,6 +64,8 @@ npm run test:distributed
 
 기본 보존은 7일, 이벤트 상한은 100만 개, 리소스 상한은 워크스페이스별 2만 개입니다. 조회 상한·누락·지연은 화면에 표시합니다. OTLP는 gzip을 포함한 HTTP JSON 트레이스 일부만 지원하며 protobuf/gRPC·OTLP 로그·지표는 지원하지 않습니다. 고용량 저장 어댑터, SSO, 자동 배포 발견은 로드맵에 구분했습니다.
 
-[전체 README](README.md) · [기획·UX](docs/PRODUCT.md) · [설계](docs/ARCHITECTURE.md) · [리서치](docs/RESEARCH.md) · [API](docs/API.md) · [운영](docs/OPERATIONS.md) · [검증 기록](docs/VERIFICATION.md)
+2026-10-09 [오픈소스 비교 리뷰](docs/OSS_COMPARISON_REVIEW.md)에서 정확성·조사 흐름 문제 7건과 기능·UX 격차를 확인했습니다. 해당 문제는 아직 수정 전입니다. CI 통과를 성숙한 운영 제품과의 동등성이나 운영 준비 완료로 해석하지 않습니다.
+
+[전체 README](README.md) · [기획·UX](docs/PRODUCT.md) · [설계](docs/ARCHITECTURE.md) · [리서치](docs/RESEARCH.md) · [비교 리뷰](docs/OSS_COMPARISON_REVIEW.md) · [API](docs/API.md) · [운영](docs/OPERATIONS.md) · [검증 기록](docs/VERIFICATION.md)
 
 MIT License. 참조 제품의 UI 코드나 이미지는 복제하지 않았습니다.

@@ -1,0 +1,271 @@
+{
+  "reviewed_at": "2026-10-09T09:58:27.372960+00:00",
+  "signaldesk_base": "fbfbdeec79417d4d9ab5759f9a7b9c5042920c0d",
+  "method": "Pinned GitHub tree, selected source and license inspection. Upstream source was not executed or redistributed. Current main is not a released deployment.",
+  "sources": [
+    {
+      "repo": "SigNoz/signoz",
+      "sha": "5f8fa52e7cda3b345df755f097b476f4114c7415",
+      "path": "LICENSE",
+      "bytes": 1589,
+      "url": "https://github.com/SigNoz/signoz/blob/5f8fa52e7cda3b345df755f097b476f4114c7415/LICENSE",
+      "sha256": "449417bc4e96c1787726c58de4b846b2d5146076e4a0a82a2093452ec0882abf"
+    },
+    {
+      "repo": "SigNoz/signoz",
+      "sha": "5f8fa52e7cda3b345df755f097b476f4114c7415",
+      "path": "frontend/src/components/CustomTimePicker/CustomTimePicker.tsx",
+      "bytes": 19094,
+      "url": "https://github.com/SigNoz/signoz/blob/5f8fa52e7cda3b345df755f097b476f4114c7415/frontend/src/components/CustomTimePicker/CustomTimePicker.tsx",
+      "sha256": "ae83d7fa7b9cc388401eafe509377178f92fb14453f259099e58ffe37ffc9305"
+    },
+    {
+      "repo": "SigNoz/signoz",
+      "sha": "5f8fa52e7cda3b345df755f097b476f4114c7415",
+      "path": "frontend/src/container/LogsExplorerViews/LogsActionsContainer.tsx",
+      "bytes": 3256,
+      "url": "https://github.com/SigNoz/signoz/blob/5f8fa52e7cda3b345df755f097b476f4114c7415/frontend/src/container/LogsExplorerViews/LogsActionsContainer.tsx",
+      "sha256": "03b04b18f22bd58adc678fbb676713ef5e7a7eece1570f8886278a19f1c15c2b"
+    },
+    {
+      "repo": "SigNoz/signoz",
+      "sha": "5f8fa52e7cda3b345df755f097b476f4114c7415",
+      "path": "frontend/src/container/SavedViews/SaveViewModal.tsx",
+      "bytes": 2141,
+      "url": "https://github.com/SigNoz/signoz/blob/5f8fa52e7cda3b345df755f097b476f4114c7415/frontend/src/container/SavedViews/SaveViewModal.tsx",
+      "sha256": "cbf613ac3a9e00367dcba91046ea9993cb09f60657c5586f21f912fc0b7ecea5"
+    },
+    {
+      "repo": "SigNoz/signoz",
+      "sha": "5f8fa52e7cda3b345df755f097b476f4114c7415",
+      "path": "frontend/src/components/QueryBuilderV2/QueryBuilderV2.tsx",
+      "bytes": 9779,
+      "url": "https://github.com/SigNoz/signoz/blob/5f8fa52e7cda3b345df755f097b476f4114c7415/frontend/src/components/QueryBuilderV2/QueryBuilderV2.tsx",
+      "sha256": "66cd73b7ab4163999a68c85f7afd59bda3913f56b7bdbf2bb2226ecb8086dbb8"
+    },
+    {
+      "repo": "grafana/grafana",
+      "sha": "9e4ddd2581aecdcab2c34bfba1827789f17fb358",
+      "path": "LICENSE",
+      "bytes": 34523,
+      "url": "https://github.com/grafana/grafana/blob/9e4ddd2581aecdcab2c34bfba1827789f17fb358/LICENSE",
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+    },
+    {
+      "repo": "grafana/grafana",
+      "sha": "9e4ddd2581aecdcab2c34bfba1827789f17fb358",
+      "path": "packages/grafana-ui/src/components/DateTimePickers/TimeRangePicker.tsx",
+      "bytes": 11171,
+      "url": "https://github.com/grafana/grafana/blob/9e4ddd2581aecdcab2c34bfba1827789f17fb358/packages/grafana-ui/src/components/DateTimePickers/TimeRangePicker.tsx",
+      "sha256": "bf08daaf3f426f4cf823e202cd5e57856467839195d01fd7c8de9617b9820b0c"
+    },
+    {
+      "repo": "grafana/grafana",
+      "sha": "9e4ddd2581aecdcab2c34bfba1827789f17fb358",
+      "path": "public/app/features/dashboard-scene/scene/DashboardScene.tsx",
+      "bytes": 60892,
+      "url": "https://github.com/grafana/grafana/blob/9e4ddd2581aecdcab2c34bfba1827789f17fb358/public/app/features/dashboard-scene/scene/DashboardScene.tsx",
+      "sha256": "492c4055c99fe103b6802446726fca09115922af1521b271c511d6a9fdda1271"
+    },
+    {
+      "repo": "grafana/grafana",
+      "sha": "9e4ddd2581aecdcab2c34bfba1827789f17fb358",
+      "path": "public/app/features/alerting/unified/rule-editor/RuleEditor.tsx",
+      "bytes": 4713,
+      "url": "https://github.com/grafana/grafana/blob/9e4ddd2581aecdcab2c34bfba1827789f17fb358/public/app/features/alerting/unified/rule-editor/RuleEditor.tsx",
+      "sha256": "4d74942beb091ac55b6025f40bd0763d0c299a93689ea1017b6c016afa09439e"
+    },
+    {
+      "repo": "grafana/grafana",
+      "sha": "9e4ddd2581aecdcab2c34bfba1827789f17fb358",
+      "path": "packages/grafana-alerting/src/grafana/notificationPolicies/components/RoutingTreeSelector/RoutingTreeSelector.tsx",
+      "bytes": 3870,
+      "url": "https://github.com/grafana/grafana/blob/9e4ddd2581aecdcab2c34bfba1827789f17fb358/packages/grafana-alerting/src/grafana/notificationPolicies/components/RoutingTreeSelector/RoutingTreeSelector.tsx",
+      "sha256": "2bf97b3ee8baae84fd21e547fdace43367a215e5251d1e5225e7a68bca994577"
+    },
+    {
+      "repo": "keephq/keep",
+      "sha": "465e99152e7586fcbe4c2732213d31c5c28def4b",
+      "path": "LICENSE",
+      "bytes": 1385,
+      "url": "https://github.com/keephq/keep/blob/465e99152e7586fcbe4c2732213d31c5c28def4b/LICENSE",
+      "sha256": "2fcc30d214f74aa3145f0e8c2ddaead78ad0d92b43322ef0639cdabba80f330c"
+    },
+    {
+      "repo": "keephq/keep",
+      "sha": "465e99152e7586fcbe4c2732213d31c5c28def4b",
+      "path": "keep-ui/features/incidents/incident-list/ui/incident-table-component.tsx",
+      "bytes": 4301,
+      "url": "https://github.com/keephq/keep/blob/465e99152e7586fcbe4c2732213d31c5c28def4b/keep-ui/features/incidents/incident-list/ui/incident-table-component.tsx",
+      "sha256": "fe3a6c57b86aa7ed20bcd7185f5287378fd02659b66d84c4d0956f5858bee076"
+    },
+    {
+      "repo": "keephq/keep",
+      "sha": "465e99152e7586fcbe4c2732213d31c5c28def4b",
+      "path": "keep-ui/app/(keep)/rules/CorrelationSidebar/CorrelationForm.tsx",
+      "bytes": 14742,
+      "url": "https://github.com/keephq/keep/blob/465e99152e7586fcbe4c2732213d31c5c28def4b/keep-ui/app/(keep)/rules/CorrelationSidebar/CorrelationForm.tsx",
+      "sha256": "8be90a57e54cf8c238b6fc87282b7c262eb66fc5c4f17d5fd8c98a9493c1a66d"
+    },
+    {
+      "repo": "keephq/keep",
+      "sha": "465e99152e7586fcbe4c2732213d31c5c28def4b",
+      "path": "docs/overview/correlation-rules.mdx",
+      "bytes": 3659,
+      "url": "https://github.com/keephq/keep/blob/465e99152e7586fcbe4c2732213d31c5c28def4b/docs/overview/correlation-rules.mdx",
+      "sha256": "54b909cd2d90365bc0a8d5d7af9866de052829e69dbc004eade6a1f2f1914269"
+    },
+    {
+      "repo": "openobserve/openobserve",
+      "sha": "749db41b6327c8e3bafc6c9cd47a771c2368de14",
+      "path": "LICENSE",
+      "bytes": 34523,
+      "url": "https://github.com/openobserve/openobserve/blob/749db41b6327c8e3bafc6c9cd47a771c2368de14/LICENSE",
+      "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0"
+    },
+    {
+      "repo": "openobserve/openobserve",
+      "sha": "749db41b6327c8e3bafc6c9cd47a771c2368de14",
+      "path": "web/src/components/DateTime.vue",
+      "bytes": 56300,
+      "url": "https://github.com/openobserve/openobserve/blob/749db41b6327c8e3bafc6c9cd47a771c2368de14/web/src/components/DateTime.vue",
+      "sha256": "59e9783c64afa362e50dd63dafc958697a1e2383227316ed344dec648e771158"
+    },
+    {
+      "repo": "openobserve/openobserve",
+      "sha": "749db41b6327c8e3bafc6c9cd47a771c2368de14",
+      "path": "web/src/plugins/logs/SearchBar.vue",
+      "bytes": 206478,
+      "url": "https://github.com/openobserve/openobserve/blob/749db41b6327c8e3bafc6c9cd47a771c2368de14/web/src/plugins/logs/SearchBar.vue",
+      "sha256": "6e59067f9fc435ce4cae1b0f70034bd7210d0e42f0d5019e4167ea242552da6d"
+    },
+    {
+      "repo": "openobserve/openobserve",
+      "sha": "749db41b6327c8e3bafc6c9cd47a771c2368de14",
+      "path": "web/src/plugins/logs/SearchResult.vue",
+      "bytes": 107815,
+      "url": "https://github.com/openobserve/openobserve/blob/749db41b6327c8e3bafc6c9cd47a771c2368de14/web/src/plugins/logs/SearchResult.vue",
+      "sha256": "d0f8733a5584715d54b6f9fe65dd880e458669aa3888bda186908a1bd2816482"
+    },
+    {
+      "repo": "OneUptime/oneuptime",
+      "sha": "e6b37dcae85ae913044379e221ca48c8f0250f37",
+      "path": "LICENSE",
+      "bytes": 11989,
+      "url": "https://github.com/OneUptime/oneuptime/blob/e6b37dcae85ae913044379e221ca48c8f0250f37/LICENSE",
+      "sha256": "252ae3f8d465ce9df56f6531c73107c674f40d7d053581e148d387c93979cb86"
+    },
+    {
+      "repo": "OneUptime/oneuptime",
+      "sha": "e6b37dcae85ae913044379e221ca48c8f0250f37",
+      "path": "packages/App/FeatureSet/Dashboard/src/Pages/OnCallDuty/OnCallDutyPolicy/Escalation.tsx",
+      "bytes": 1023,
+      "url": "https://github.com/OneUptime/oneuptime/blob/e6b37dcae85ae913044379e221ca48c8f0250f37/packages/App/FeatureSet/Dashboard/src/Pages/OnCallDuty/OnCallDutyPolicy/Escalation.tsx",
+      "sha256": "1ab3b3cc5a578eada3d466b50052f227ce2317cad441827ee5543c9443726dcc"
+    },
+    {
+      "repo": "OneUptime/oneuptime",
+      "sha": "e6b37dcae85ae913044379e221ca48c8f0250f37",
+      "path": "packages/App/FeatureSet/Dashboard/src/Pages/OnCallDuty/ScheduleTimeline.tsx",
+      "bytes": 522,
+      "url": "https://github.com/OneUptime/oneuptime/blob/e6b37dcae85ae913044379e221ca48c8f0250f37/packages/App/FeatureSet/Dashboard/src/Pages/OnCallDuty/ScheduleTimeline.tsx",
+      "sha256": "8d19d7ce7fd2ccd27877183aee2879895d0a95c881beacf39742add8ceac7f79"
+    },
+    {
+      "repo": "langfuse/langfuse",
+      "sha": "2cc5e6b936c40a85cf25c5c3d558333433d003fa",
+      "path": "LICENSE",
+      "bytes": 1612,
+      "url": "https://github.com/langfuse/langfuse/blob/2cc5e6b936c40a85cf25c5c3d558333433d003fa/LICENSE",
+      "sha256": "fd09d42b5b16606ad2042cc1edf3a82da1c47743709f170c959c74758af229d6"
+    },
+    {
+      "repo": "langfuse/langfuse",
+      "sha": "2cc5e6b936c40a85cf25c5c3d558333433d003fa",
+      "path": "web/src/features/traces/TracesTable.tsx",
+      "bytes": 56833,
+      "url": "https://github.com/langfuse/langfuse/blob/2cc5e6b936c40a85cf25c5c3d558333433d003fa/web/src/features/traces/TracesTable.tsx",
+      "sha256": "b413e8a2d5ab01991d670e8372f0b1203304b322448367f3d97352c3a5893a7b"
+    },
+    {
+      "repo": "langfuse/langfuse",
+      "sha": "2cc5e6b936c40a85cf25c5c3d558333433d003fa",
+      "path": "web/src/features/datasets/components/DatasetCompareRunsTable.tsx",
+      "bytes": 10106,
+      "url": "https://github.com/langfuse/langfuse/blob/2cc5e6b936c40a85cf25c5c3d558333433d003fa/web/src/features/datasets/components/DatasetCompareRunsTable.tsx",
+      "sha256": "5c3a610a3a5544ea64de967ee104291fd11b60bfc8b39b3cdbdd97be5afd7ac0"
+    },
+    {
+      "repo": "comet-ml/opik",
+      "sha": "a597c52d93354f5848aa2867e6a9cc6bdd02abba",
+      "path": "LICENSE",
+      "bytes": 11391,
+      "url": "https://github.com/comet-ml/opik/blob/a597c52d93354f5848aa2867e6a9cc6bdd02abba/LICENSE",
+      "sha256": "0236cf0195e033d15c120e610d44943e8e478ffed5d60fbba1b5a6b96e778a47"
+    },
+    {
+      "repo": "comet-ml/opik",
+      "sha": "a597c52d93354f5848aa2867e6a9cc6bdd02abba",
+      "path": "apps/opik-frontend/src/v2/pages-shared/traces/TraceDetailsPanel/TraceDetailsPanel.tsx",
+      "bytes": 19415,
+      "url": "https://github.com/comet-ml/opik/blob/a597c52d93354f5848aa2867e6a9cc6bdd02abba/apps/opik-frontend/src/v2/pages-shared/traces/TraceDetailsPanel/TraceDetailsPanel.tsx",
+      "sha256": "2310f9e73907536d4351952e39854d960d5687e885b86b290b2d6fdfc326ab03"
+    },
+    {
+      "repo": "comet-ml/opik",
+      "sha": "a597c52d93354f5848aa2867e6a9cc6bdd02abba",
+      "path": "apps/opik-frontend/src/v2/pages-shared/experiments/useExperimentsTableConfig.tsx",
+      "bytes": 12816,
+      "url": "https://github.com/comet-ml/opik/blob/a597c52d93354f5848aa2867e6a9cc6bdd02abba/apps/opik-frontend/src/v2/pages-shared/experiments/useExperimentsTableConfig.tsx",
+      "sha256": "0e0ffe76d9f481e4072bab72d1846d44b51de8c3bdd50fcc0ad2d0e0e24e7d83"
+    },
+    {
+      "repo": "prometheus/alertmanager",
+      "sha": "ae962109158fa50c90ea425f2bb97887ebe2fc50",
+      "path": "LICENSE",
+      "bytes": 11357,
+      "url": "https://github.com/prometheus/alertmanager/blob/ae962109158fa50c90ea425f2bb97887ebe2fc50/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "repo": "prometheus/alertmanager",
+      "sha": "ae962109158fa50c90ea425f2bb97887ebe2fc50",
+      "path": "config/config.go",
+      "bytes": 39705,
+      "url": "https://github.com/prometheus/alertmanager/blob/ae962109158fa50c90ea425f2bb97887ebe2fc50/config/config.go",
+      "sha256": "eba780026af8a12ef8eb02e3fc1f9d4835de17c3b8848ab75b81f754b405989c"
+    },
+    {
+      "repo": "prometheus/alertmanager",
+      "sha": "ae962109158fa50c90ea425f2bb97887ebe2fc50",
+      "path": "inhibit/inhibit.go",
+      "bytes": 9988,
+      "url": "https://github.com/prometheus/alertmanager/blob/ae962109158fa50c90ea425f2bb97887ebe2fc50/inhibit/inhibit.go",
+      "sha256": "22bb37709a8613b0ddd6c78f0ddf8505404d2f9f46ed09a854b50cd725ab59d4"
+    },
+    {
+      "repo": "OneUptime/oneuptime",
+      "sha": "e6b37dcae85ae913044379e221ca48c8f0250f37",
+      "path": "packages/App/FeatureSet/Dashboard/src/Components/OnCallPolicy/EscalationRule/EscalationRules.tsx",
+      "bytes": 66806,
+      "url": "https://github.com/OneUptime/oneuptime/blob/e6b37dcae85ae913044379e221ca48c8f0250f37/packages/App/FeatureSet/Dashboard/src/Components/OnCallPolicy/EscalationRule/EscalationRules.tsx",
+      "sha256": "193ba9246a49b85777ff920a2d21919aa86c956351aaee7e3362ff3524feb3d8"
+    },
+    {
+      "repo": "grafana/grafana",
+      "sha": "9e4ddd2581aecdcab2c34bfba1827789f17fb358",
+      "path": "public/app/core/components/TimeSeries/TimeSeries.tsx",
+      "bytes": 2192,
+      "url": "https://github.com/grafana/grafana/blob/9e4ddd2581aecdcab2c34bfba1827789f17fb358/public/app/core/components/TimeSeries/TimeSeries.tsx",
+      "sha256": "1f6df1c855d11d78cc3c3ce679a650b450ca2f897cd622fadf14e170021463c2"
+    },
+    {
+      "repo": "comet-ml/opik",
+      "sha": "a597c52d93354f5848aa2867e6a9cc6bdd02abba",
+      "path": "apps/opik-frontend/src/v2/pages/CompareExperimentsPage/CompareExperimentsPage.tsx",
+      "bytes": 4930,
+      "url": "https://github.com/comet-ml/opik/blob/a597c52d93354f5848aa2867e6a9cc6bdd02abba/apps/opik-frontend/src/v2/pages/CompareExperimentsPage/CompareExperimentsPage.tsx",
+      "sha256": "17da8276891a1c8085e0976f857e70c24dc39ba9b942804abf32e06c725dc016"
+    }
+  ]
+}
