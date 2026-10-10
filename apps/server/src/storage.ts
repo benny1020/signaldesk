@@ -18,6 +18,8 @@ export type Delivery = {
   alert_id: string;
   channel_id: string;
   status: 'pending' | 'delivered' | 'failed' | 'cancelled';
+  event_key: string;
+  event_type: 'firing' | 'recovery' | 'repeat';
   attempts: number;
   next_at: number;
   created_at: number;
@@ -43,13 +45,20 @@ export interface ControlStore {
   setSetting(key: string, value: string): Maybe<void>;
   audit(workspace: Workspace, actor: string, action: string, target: string): Maybe<void>;
   auditTrail(workspace: Workspace): Maybe<unknown[]>;
+  deliveryStats(
+    workspace: Workspace,
+  ): Maybe<{ pending: number; failed: number; delivered: number; oldestPendingAt: number | null }>;
   deliveries(workspace?: Workspace, dueAt?: number): Maybe<Delivery[]>;
   updateDelivery(
     id: string,
     patch: Partial<Omit<Delivery, 'id' | 'workspace' | 'alert_id' | 'channel_id'>>,
   ): Maybe<void>;
   retryDelivery(id: string, workspace: Workspace, now: number): Maybe<boolean>;
-  publishAlert(alert: Alert, channelIds: string[]): Maybe<void>;
+  publishAlert(
+    alert: Alert,
+    channelIds: string[],
+    notification?: { key: string; type: Delivery['event_type']; time: number },
+  ): Maybe<void>;
   withControl<T>(fn: () => Promise<T>): Promise<T>;
   withWorker(key: string, fn: () => Promise<void>): Promise<boolean>;
   retireResource(id: string, workspace: Workspace, retired: boolean): Maybe<boolean>;

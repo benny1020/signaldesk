@@ -1,3 +1,4 @@
+import { aggregateSQL } from './aggregate.ts';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID, createHash } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
@@ -16,6 +17,12 @@ import type {
 } from '../../../packages/contracts/src/index.ts';
 
 export interface TelemetryStore {
+  aggregate?(
+    kind: import('../../../packages/contracts/src/index.ts').AggregateKind,
+    scope: QueryScope & { route?: string; latencyMs?: number },
+  ):
+    | import('../../../packages/contracts/src/index.ts').AggregateResult
+    | Promise<import('../../../packages/contracts/src/index.ts').AggregateResult>;
   append(workspace: Workspace, events: TelemetryEvent[]): number | Promise<number>;
   query(
     kind: TelemetryEvent['kind'],
@@ -79,6 +86,16 @@ export class Store implements TelemetryStore, ControlStore {
       CREATE INDEX IF NOT EXISTS resources_scope ON resources(workspace,last_seen DESC,id DESC);
       CREATE TABLE IF NOT EXISTS latest_metrics(workspace TEXT NOT NULL,resource_id TEXT NOT NULL,name TEXT NOT NULL,time INTEGER NOT NULL,data TEXT NOT NULL,PRIMARY KEY(workspace,resource_id,name));
       CREATE INDEX IF NOT EXISTS latest_metrics_time ON latest_metrics(workspace,time DESC);`);
+    if (!this.db.prepare('SELECT version FROM migrations WHERE version=3').get()) {
+      this.transaction(() =>
+        this.db.exec(`ALTER TABLE outbox RENAME TO outbox_v2;
+        CREATE TABLE outbox(id TEXT PRIMARY KEY,workspace TEXT NOT NULL,alert_id TEXT NOT NULL,channel_id TEXT NOT NULL,status TEXT NOT NULL,attempts INTEGER NOT NULL DEFAULT 0,next_at INTEGER NOT NULL,error TEXT,created_at INTEGER NOT NULL,delivered_at INTEGER,event_key TEXT NOT NULL,event_type TEXT NOT NULL,UNIQUE(event_key,channel_id));
+        INSERT INTO outbox SELECT *,alert_id,'firing' FROM outbox_v2;
+        DROP TABLE outbox_v2;
+        CREATE INDEX outbox_due ON outbox(next_at) WHERE status='pending';
+        INSERT INTO migrations VALUES(3,unixepoch()*1000);`),
+      );
+    }
     if (!this.db.prepare('SELECT version FROM migrations WHERE version=2').get()) {
       this.transaction(() => {
         for (const row of this.db.prepare('SELECT workspace,data FROM telemetry').all() as {
@@ -160,6 +177,16 @@ export class Store implements TelemetryStore, ControlStore {
         where.push(`coalesce(json_extract(data,'$.${key}'),'unknown')=?`);
         args.push(scope[key]!);
       }
+    if (scope.eventId) {
+      where.push('id=?');
+      args.push(scope.eventId);
+    }
+    if (scope.route && kind === 'span') {
+      where.push(
+        "coalesce(json_extract(data,'$.attributes.\"http.route\"'),json_extract(data,'$.name'))=?",
+      );
+      args.push(scope.route);
+    }
     if (scope.search) {
       where.push("instr(lower(json_extract(data,'$.message')),lower(?))>0");
       args.push(scope.search);
@@ -205,6 +232,24 @@ export class Store implements TelemetryStore, ControlStore {
           : null,
     };
   }
+  aggregate(
+    kind: import('../../../packages/contracts/src/index.ts').AggregateKind,
+    scope: QueryScope & { route?: string; latencyMs?: number },
+  ) {
+    const { sql, values, stepMs } = aggregateSQL(kind, scope, false);
+    const rows = this.db.prepare(sql).all(...(values as (string | number)[])) as Record<
+      string,
+      string | number | null
+    >[];
+    return {
+      rows: rows.slice(0, 1000),
+      truncated: rows.length > 1000,
+      from: scope.from,
+      to: scope.to,
+      stepMs,
+      source: 'retained-telemetry-sql' as const,
+    };
+  }
   occupancy() {
     return Number(
       (this.db.prepare('SELECT count(*) AS n FROM telemetry').get() as { n: number }).n,
@@ -233,7 +278,7 @@ export class Store implements TelemetryStore, ControlStore {
       .get(kind, id, workspace) as { data: string } | undefined;
     return r ? JSON.parse(r.data) : null;
   }
-  put(kind: string, entity: { id: string; workspace: Workspace }) {
+  put<T extends { id: string; workspace: Workspace }>(kind: string, entity: T) {
     this.db
       .prepare(
         'INSERT INTO entities VALUES(?,?,?,?) ON CONFLICT(kind,id) DO UPDATE SET data=excluded.data WHERE entities.workspace=excluded.workspace',
@@ -287,14 +332,20 @@ export class Store implements TelemetryStore, ControlStore {
       id = createHash('sha256').update(resourceKey(event)).digest('hex');
     this.db
       .prepare(
-        `INSERT INTO resources(id,workspace,first_seen,last_seen,data) VALUES(?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET first_seen=min(first_seen,excluded.first_seen),last_seen=max(last_seen,excluded.last_seen),data=CASE WHEN excluded.last_seen>=last_seen THEN excluded.data ELSE data END`,
+        `INSERT INTO resources(id,workspace,first_seen,last_seen,data) VALUES(?,?,?,?,?) ON CONFLICT(workspace,id) DO UPDATE SET first_seen=min(first_seen,excluded.first_seen),last_seen=max(last_seen,excluded.last_seen),data=json_set(CASE WHEN excluded.last_seen>=last_seen THEN excluded.data ELSE data END,'$.observedApplication',coalesce(json_extract(data,'$.observedApplication'),0) OR json_extract(excluded.data,'$.observedApplication'))`,
       )
       .run(
         id,
         workspace,
         event.timestamp,
         event.timestamp,
-        JSON.stringify({ ...resource, id, host: event.host }),
+        JSON.stringify({
+          ...resource,
+          id,
+          host: event.host,
+          observedApplication:
+            event.kind !== 'metric' || !['cpu_pct', 'memory_pct'].includes(event.name),
+        }),
       );
     if (event.kind === 'metric')
       this.db
@@ -393,6 +444,19 @@ export class Store implements TelemetryStore, ControlStore {
       )
       .all(workspace);
   }
+  deliveryStats(workspace: Workspace) {
+    const rows = this.db
+      .prepare(
+        'SELECT status,count(*) AS n,min(created_at) AS oldest FROM outbox WHERE workspace=? GROUP BY status',
+      )
+      .all(workspace) as { status: string; n: number; oldest: number }[];
+    return {
+      pending: rows.find((r) => r.status === 'pending')?.n ?? 0,
+      failed: rows.find((r) => r.status === 'failed')?.n ?? 0,
+      delivered: rows.find((r) => r.status === 'delivered')?.n ?? 0,
+      oldestPendingAt: rows.find((r) => r.status === 'pending')?.oldest ?? null,
+    };
+  }
   deliveries(workspace?: Workspace, dueAt?: number): Delivery[] {
     return this.db
       .prepare(
@@ -422,13 +486,21 @@ export class Store implements TelemetryStore, ControlStore {
       )
       .run(now, id, workspace).changes;
   }
-  publishAlert(alert: Alert, channelIds: string[]) {
+  publishAlert(
+    alert: Alert,
+    channelIds: string[],
+    notification = {
+      key: alert.id,
+      type: 'firing' as Delivery['event_type'],
+      time: alert.createdAt,
+    },
+  ) {
     this.transaction(() => {
       this.put('alert', alert);
       for (const channelId of channelIds)
         this.db
           .prepare(
-            'INSERT OR IGNORE INTO outbox(id,workspace,alert_id,channel_id,status,next_at,created_at) VALUES(?,?,?,?,?,?,?)',
+            'INSERT OR IGNORE INTO outbox(id,workspace,alert_id,channel_id,status,next_at,created_at,event_key,event_type) VALUES(?,?,?,?,?,?,?,?,?)',
           )
           .run(
             randomUUID(),
@@ -436,10 +508,12 @@ export class Store implements TelemetryStore, ControlStore {
             alert.id,
             channelId,
             'pending',
-            alert.createdAt,
-            alert.createdAt,
+            notification.time,
+            notification.time,
+            notification.key,
+            notification.type,
           );
-      this.audit(alert.workspace, 'worker', 'alert.firing', alert.id);
+      this.audit(alert.workspace, 'worker', 'alert.' + notification.type, alert.id);
     });
   }
   async withControl<T>(fn: () => Promise<T>): Promise<T> {

@@ -10,6 +10,14 @@ export class SignalDeskClient {
     onError = () => {},
     resource = {},
   } = {}) {
+    if (
+      !Number.isInteger(batchSize) ||
+      batchSize < 1 ||
+      batchSize > 1000 ||
+      !Number.isInteger(maxQueue) ||
+      maxQueue < batchSize
+    )
+      throw new Error('batchSize must be 1–1000 and maxQueue must cover a batch');
     this.resource = resource;
     this.endpoint = endpoint.replace(/\/$/, '');
     this.token = token;

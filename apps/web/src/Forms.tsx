@@ -73,6 +73,7 @@ export function CreateForm({
               }
             : {
                 ...values(),
+                ...(kind === 'probe' ? { vantageRegion: values().vantageRegion || undefined } : {}),
                 ...Object.fromEntries(
                   dimensionKeys.map((key) => [key, values()[key] || undefined]),
                 ),
@@ -286,6 +287,13 @@ export function CreateForm({
               </select>
             </label>
           </div>
+        )}
+        {kind === 'probe' && (
+          <label>
+            검사 실행 리전 (비우면 가용 worker)
+            <input name="vantageRegion" placeholder="ap-northeast-2" />
+            <small>지정 리전의 worker가 없으면 검사가 실행되지 않습니다.</small>
+          </label>
         )}
         {(kind === 'channel' || kind === 'probe') && (
           <>

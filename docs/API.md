@@ -1,6 +1,6 @@
 # API reference
 
-Version 0.2. Native contract: `packages/contracts/src/index.ts`. Content-Type: `application/json`. No CORS is enabled; serve the UI and API from the same origin. In local mode loopback Host and Origin are enforced. In token mode use an Authorization bearer token.
+Version 0.3. Native contract: `packages/contracts/src/index.ts`. Content-Type: `application/json`. No CORS is enabled; serve the UI and API from the same origin. In local mode loopback Host and Origin are enforced. In token mode use an Authorization bearer token.
 
 ## Scope and roles
 
@@ -38,7 +38,7 @@ Local mode is equivalent to a local operator and is never allowed on a non-loopb
 | POST / PATCH | `/api/probes[/:id]`         | Create HTTPS GET check, toggle enabled; Live only / admin                                                                          |
 | POST         | `/api/deliveries/:id/retry` | Reset failed delivery attempt budget / admin                                                                                       |
 
-Lists return `{items,nextCursor,truncated}` for telemetry. Cursor order is timestamp and event ID descending. Treat cursors as opaque. HTTP 400 indicates invalid input, 401 missing/invalid token, 403 scope/role denial, 404 missing item, 429 rate limit and 507 storage/cardinality capacity, 503 operational database/worker availability errors. The API has a 1 MiB expanded request body limit (gzip supported) and a default 240 requests/minute per client IP. Behind a proxy configure an explicit trusted-client strategy before changing this limiter.
+Lists return `{items,nextCursor,truncated}` for telemetry. Cursor order is timestamp and event ID descending. Treat cursors as opaque. HTTP 400 indicates invalid input, 401 missing/invalid token, 403 scope/role denial, 404 missing item, 429 rate limit and 507 storage/cardinality capacity, 503 operational database/worker availability errors. The API has a 1 MiB expanded request body limit (gzip supported) and a default 240 requests/minute per client IP. `/health` bypasses the application quota. Set `TRUSTED_PROXIES` to exact trusted ingress addresses; forwarded headers are ignored by default.
 
 ## Events
 
@@ -62,7 +62,7 @@ Other common fields: optional stable `id` (max 128), `timestamp`, nonempty `serv
 }
 ```
 
-Metric names: `request_rate` (req/s), `error_pct` (%), `latency_p95_ms` (ms), `cpu_pct` (%), `memory_pct` (%), `probe_up` (0/1), `probe_duration_ms` (one synthetic request duration, not p95), `ai_cost_usd` (USD measurement supplied by producer). Values are finite/nonnegative; percentages are ≤100. Include `host` for host resource metrics. Rates and percentiles are producer-calculated gauges, not raw counters or histograms. Do not send a cumulative count under `request_rate`.
+Metric names: `request_rate` (req/s), `error_pct` (%), `latency_p95_ms` (ms), `cpu_pct` (%), `memory_pct` (%), `probe_up` (0/1), `probe_duration_ms` (one synthetic request duration, not p95), `ai_cost_usd` (USD measurement supplied by producer). Built-in operational values are finite/nonnegative; percentages are ≤100. Custom metric names match `^[a-zA-Z_:][a-zA-Z0-9_.:]*$` and accept finite signed gauges. Monotonic counters are nonnegative. Include `host` for host resource metrics. Operational rates and p95 remain producer-calculated gauges. Custom metrics may include `metricType`, `unit`, `temporality`, `startTimestamp` and `histogram:{count,sum,bounds,bucketCounts}`. Bounds are strictly ordered and bucket counts must sum to count. Distribution metadata is retained; the platform does not merge it into a population p95. Do not send a cumulative count under `request_rate`.
 
 ```json
 {
@@ -162,6 +162,49 @@ Sustained violation holds group pendingSince. Clearing resolves that group's act
 
 ## Incident and notification semantics
 
-Create incident: title, service, environment, optional deployment identity, severity, owner and optional scoped alertId. Patch: investigating/identified/monitoring/resolved status, owner and/or note. Timeline entries record actor/time. An incident is not automatically closed when its alert recovers.
+Create incident: title, service, environment, optional deployment identity, severity, owner and optional scoped alertId and alertIds (up to 100). Patch: investigating/identified/monitoring/resolved status, owner, linked alertIds and/or note. Timeline entries record actor/time. An incident is not automatically closed when its alert recovers.
 
-The generic webhook body is `{source:"signaldesk",deliveryId,alert}`. New Live alert creation and outbox insertion are one control transaction. Pending delivery may be deferred by snooze or cancelled on recovery/channel disable. HTTP 2xx succeeds; redirects do not. Failures retry with bounded exponential delay, five attempts total. Crash after remote success can redeliver: deduplicate deliveryId. Acknowledge is independent from delivery and incident state.
+The generic webhook body includes `source`, `deliveryId`, `event` (`firing|repeat|recovery`), `alert`, owner and absolute investigation context. See notification policies below. New Live alert creation and outbox insertion are one control transaction. Pending delivery may be deferred by snooze or cancelled on recovery/channel disable. HTTP 2xx succeeds; redirects do not. Failures retry with bounded exponential delay, five attempts total. Crash after remote success can redeliver: deduplicate deliveryId. Acknowledge is independent from delivery and incident state.
+
+## v0.3 investigation and operations
+
+| Method             | Path                               | Contract                                                                                                                                     |
+| ------------------ | ---------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET                | `/api/events/log/:id`              | Exact log ID within workspace, environment, time and resource scope; read                                                                    |
+| GET                | `/api/analysis/:kind`              | `logBuckets`, `errorGroups`, `apis`, `relations`, `ai`, `metricSeries`, `traces`; retained SQL, up to 1,000 groups; read                     |
+| GET                | `/api/catalog`                     | Catalog services, teams, owner and unowned observed names; read                                                                              |
+| GET / POST / PATCH | `/api/teams[/:id]`                 | Team name/contact; writes admin                                                                                                              |
+| GET / POST / PATCH | `/api/catalog/services[/:id]`      | Name/aliases/teamId/repository/runbook/criticality/regions/description; writes admin                                                         |
+| GET / POST / PATCH | `/api/notification-routes[/:id]`   | Service/team/environment/severity/resource match, channelIds, repeatMinutes, notifyRecovery, enabled; writes admin                           |
+| POST               | `/api/notification-routes/preview` | `{alertId,at?}` returns owner, matchedRouteIds, selected channelIds, suppressedBy; current time unless at is supplied; read, no transmission |
+| GET / POST / PATCH | `/api/maintenance[/:id]`           | Name, service/environment/resource scope, ordered `from`/`to` ≤7 days, reason; writes admin, actor recorded                                  |
+| GET / POST / PATCH | `/api/slos[/:id]`                  | Shared success/latency objective and resource/route scope; writes admin                                                                      |
+| GET                | `/api/slos/status`                 | Full observed server-span denominator, bad count, success, budget remaining, burn rate and insufficient-data state; read                     |
+| GET / POST / PATCH | `/api/evaluation/datasets[/:id]`   | Named version, ≤500 unique-ID cases with scalar expected/actual fields; writes admin                                                         |
+| GET / POST         | `/api/evaluation/runs`             | Dataset, model/prompt versions, baseline ID and optional candidate `actuals`; run/persist admin                                              |
+| POST               | `/api/diagnosis`                   | `{external:false}` local read, `{external:true}` explicit admin request + configured gateway; bounded evidence only                          |
+| POST               | `/api/v1/logs`, `/api/v1/metrics`  | OTLP HTTP JSON subsets, gzip, ingest role                                                                                                    |
+
+Control PATCH requests contain the **complete definition**; responses preserve ID/createdAt and increment revision. Up to 1,000 of each new entity kind per workspace. Catalog links allow HTTP(S) only; team/channel references must exist within the workspace. Entity revisions and audit are stored; full historical definition snapshots are not provided.
+
+`route` narrows API/trace/SLI server-span lookup using `http.route` (fallback span name). Trace groups include child-only partial traces, with root_count and explicit truncation. Analysis is over retained telemetry; sampled traces cannot prove a whole-traffic denominator. API latency is average/max, not an invented percentile. Error groups include service/environment/exception/code/exact message; digits are never blindly erased.
+
+### Notifications
+
+If no policy exists, legacy enabled-channel broadcast remains. Once any policy exists, only enabled matching routes select destinations; disabling all routes stops delivery. Maintenance suppresses transmission, not alert detection. Recipient policy is rechecked before sending. ACK stops repeats, snooze defers firing/repeats, recovery is separate, and incident resolution is independent. `snoozeReason`, actor and expiry are recorded by alert PATCH. Receivers deduplicate `deliveryId` because remote delivery remains at-least-once. Demo receipts are always cancelled before network transmission.
+
+### SLO
+
+Example: `{name:"Orders availability",service:"orders",environment:"production",objective:99.9,indicator:"availability",windowMinutes:60,minimumRequests:100,alertBurnRate:2,enabled:true}`. Optional route and all resource fields select the denominator. `indicator:"latency"` uses `latencyMs`. Shared SQL drives both the status API and background evaluator. Below minimumRequests is insufficient, not healthy. Burn rate above alertBurnRate creates a warning; a later healthy evaluation resolves it. Stopping an SLO resolves its active warning. The worker evaluates Live definitions; Demo is a fixed-time evaluation workspace. This is single-window observed-span SLI, not multi-window Prometheus burn-rate rules or merged histogram SLO.
+
+### Evaluation and diagnosis
+
+Run `{datasetId,modelVersion,promptVersion,baselineId?,actuals?:{caseId:{field:value}}}`. The runner compares fields exactly, persists failed fields, coverage and score-minus-baseline. If `actuals` is supplied, missing cases/fields lower coverage and score. Omitting it evaluates the dataset's supplied actual fixtures. Baseline must use the same dataset ID/version; changing cases requires a new dataset version. This runner never calls an LLM and does not establish semantic response correctness.
+
+Diagnosis returns `mode`, version, authorized evidence, hypotheses with supporting/counter evidence IDs, missingEvidence and nextCheck. Unknown evidence IDs reject the response. An HTTPS gateway receives counts/service identifiers/timestamps, never raw messages/prompts/tool arguments. It returns `{hypotheses:[{hypothesis,supportingEvidence,counterEvidence,missingEvidence,nextCheck}]}`. Configuration, explicit UI consent and an admin request are required for transmission. Provider quality remains unverified and there is no remediation action.
+
+### OTLP JSON limits and probe vantage
+
+Logs map resourceLogs/scopeLogs/logRecords, scalar body/severity/timestamps and trace IDs. Metrics map gauge/sum/explicit-bucket histogram; preserve name/unit/start/temporality/distribution. Nonmonotonic sums are represented as signed gauges, monotonic sums as counters. Exponential histograms, protobuf/gRPC and arbitrary point-label series aggregation are unsupported. JSON parser/key/batch/expanded body/resource limits apply to all signals.
+
+Probes may set `vantageRegion`; only a worker with that REGION executes them. Result metadata records `lastVantageRegion` and `lastWorkerId`. Target resource region and executing vantage are separate. There is no automatic substitute region when the selected worker region is unavailable.

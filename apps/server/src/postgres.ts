@@ -1,3 +1,4 @@
+import { aggregateSQL } from './aggregate.ts';
 import { Pool, type PoolClient } from 'pg';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID, createHash } from 'node:crypto';
@@ -135,6 +136,12 @@ export class PostgresStore implements Storage {
         CREATE INDEX IF NOT EXISTS entities_rule ON entities(kind,workspace,(data->>'ruleId'),(data->>'status'));
         CREATE UNIQUE INDEX IF NOT EXISTS active_alert_group ON entities(workspace,(data->>'ruleId'),coalesce(data->>'groupKey','unobserved')) WHERE kind='alert' AND data->>'status'='firing';
         CREATE TABLE IF NOT EXISTS outbox(id text PRIMARY KEY,workspace text NOT NULL,alert_id text NOT NULL,channel_id text NOT NULL,status text NOT NULL,attempts integer NOT NULL DEFAULT 0,next_at bigint NOT NULL,error text,created_at bigint NOT NULL,delivered_at bigint,UNIQUE(alert_id,channel_id));
+        ALTER TABLE outbox ADD COLUMN IF NOT EXISTS event_key text;
+        ALTER TABLE outbox ADD COLUMN IF NOT EXISTS event_type text NOT NULL DEFAULT 'firing';
+        UPDATE outbox SET event_key=alert_id WHERE event_key IS NULL;
+        ALTER TABLE outbox ALTER COLUMN event_key SET NOT NULL;
+        ALTER TABLE outbox DROP CONSTRAINT IF EXISTS outbox_alert_id_channel_id_key;
+        CREATE UNIQUE INDEX IF NOT EXISTS outbox_event_channel ON outbox(event_key,channel_id);
         CREATE INDEX IF NOT EXISTS outbox_due ON outbox(next_at) WHERE status='pending';
         CREATE TABLE IF NOT EXISTS audit(id text PRIMARY KEY,workspace text NOT NULL,time bigint NOT NULL,actor text NOT NULL,action text NOT NULL,target text NOT NULL);
         CREATE TABLE IF NOT EXISTS settings(key text PRIMARY KEY,value text NOT NULL);
@@ -175,13 +182,20 @@ export class PostgresStore implements Storage {
         data: r.data as TelemetryEvent,
         resourceId: createHash('sha256').update(resourceKey(r.data)).digest('hex'),
       }));
-      const resourceRows = new Map<string, (typeof acceptedRows)[number] & { firstSeen: number }>(),
+      const resourceRows = new Map<
+          string,
+          (typeof acceptedRows)[number] & { firstSeen: number; observedApplication: boolean }
+        >(),
         metrics = new Map<string, (typeof acceptedRows)[number]>();
       for (const row of acceptedRows) {
         const old = resourceRows.get(row.resourceId);
         resourceRows.set(row.resourceId, {
           ...(old && old.data.timestamp > row.data.timestamp ? old : row),
           firstSeen: Math.min(old?.firstSeen ?? row.data.timestamp, row.data.timestamp),
+          observedApplication:
+            !!old?.observedApplication ||
+            row.data.kind !== 'metric' ||
+            !['cpu_pct', 'memory_pct'].includes(row.data.name),
         });
         if (row.data.kind === 'metric') {
           const key = row.resourceId + ':' + row.data.name,
@@ -192,8 +206,8 @@ export class PostgresStore implements Storage {
       if (resourceRows.size)
         await this.sql(
           `INSERT INTO resources(id,workspace,first_seen,last_seen,data)
-        SELECT e->>'resourceId',$1,(e->>'firstSeen')::bigint,(e->'data'->>'timestamp')::bigint,e->'data'
-        FROM jsonb_array_elements($2::jsonb) e ON CONFLICT(workspace,id) DO UPDATE SET first_seen=least(resources.first_seen,excluded.first_seen),last_seen=greatest(resources.last_seen,excluded.last_seen),data=CASE WHEN excluded.last_seen>=resources.last_seen THEN excluded.data ELSE resources.data END`,
+        SELECT e->>'resourceId',$1,(e->>'firstSeen')::bigint,(e->'data'->>'timestamp')::bigint,(e->'data') || jsonb_build_object('observedApplication',(e->>'observedApplication')::boolean)
+        FROM jsonb_array_elements($2::jsonb) e ON CONFLICT(workspace,id) DO UPDATE SET first_seen=least(resources.first_seen,excluded.first_seen),last_seen=greatest(resources.last_seen,excluded.last_seen),data=(CASE WHEN excluded.last_seen>=resources.last_seen THEN excluded.data ELSE resources.data END) || jsonb_build_object('observedApplication',coalesce((resources.data->>'observedApplication')::boolean,false) OR (excluded.data->>'observedApplication')::boolean)`,
           [workspace, JSON.stringify([...resourceRows.values()])],
         );
       if (metrics.size)
@@ -237,6 +251,9 @@ export class PostgresStore implements Storage {
     if (scope.search) add("position(lower(?) in lower(data->>'message'))>0", scope.search);
     if (scope.level) add("data->>'level'=?", scope.level);
     if (scope.traceId) add("data->>'traceId'=?", scope.traceId);
+    if (scope.eventId) add('id=?', scope.eventId);
+    if (scope.route && kind === 'span')
+      add("coalesce(data->'attributes'->>'http.route',data->>'name')=?", scope.route);
     if (scope.metric) add("data->>'name'=?", scope.metric);
     if (scope.cursor) {
       let time: unknown, id: unknown;
@@ -283,6 +300,7 @@ export class PostgresStore implements Storage {
         ...identity(r.data),
         id: r.id,
         host: r.data.host,
+        observedApplication: r.data.observedApplication,
         firstSeen: Number(r.first_seen),
         lastSeen: Number(r.last_seen),
         retired: r.retired,
@@ -329,6 +347,52 @@ export class PostgresStore implements Storage {
       ])
     ).rowCount;
   }
+  async aggregate(
+    kind: import('../../../packages/contracts/src/index.ts').AggregateKind,
+    scope: QueryScope & { route?: string; latencyMs?: number },
+  ) {
+    const { sql, values, stepMs } = aggregateSQL(kind, scope, true);
+    const result = await this.sql(sql, values);
+    const rows = result.rows.map((row) =>
+      Object.fromEntries(
+        Object.entries(row).map(([k, v]) => [
+          k,
+          [
+            'global_group',
+            'request_rate',
+            'error_pct',
+            'latency_p95_ms',
+            'root_count',
+            'count',
+            'errors',
+            'total',
+            'bad',
+            'first_seen',
+            'last_seen',
+            'bucket',
+            'average_ms',
+            'maximum_ms',
+            'ttft_ms',
+            'input_tokens',
+            'output_tokens',
+            'cost_usd',
+            'cost_count',
+            'evaluation_count',
+          ].includes(k) && v !== null
+            ? Number(v)
+            : v,
+        ]),
+      ),
+    );
+    return {
+      rows: rows.slice(0, 1000) as Record<string, string | number | null>[],
+      truncated: rows.length > 1000,
+      from: scope.from,
+      to: scope.to,
+      stepMs,
+      source: 'retained-telemetry-sql' as const,
+    };
+  }
   async occupancy() {
     return Number(
       (await this.sql('SELECT count FROM telemetry_capacity WHERE id=1')).rows[0].count,
@@ -368,7 +432,7 @@ export class PostgresStore implements Storage {
       ).rows[0]?.data ?? null
     );
   }
-  async put(kind: string, entity: { id: string; workspace: Workspace }) {
+  async put<T extends { id: string; workspace: Workspace }>(kind: string, entity: T) {
     await this.sql(
       'INSERT INTO entities VALUES($1,$2,$3,$4) ON CONFLICT(kind,id) DO UPDATE SET data=excluded.data WHERE entities.workspace=excluded.workspace',
       [kind, entity.id, entity.workspace, JSON.stringify(entity)],
@@ -441,6 +505,22 @@ export class PostgresStore implements Storage {
       )
     ).rows.map((r) => ({ ...r, time: Number(r.time) }));
   }
+  async deliveryStats(workspace: Workspace) {
+    const rows = (
+      await this.sql(
+        'SELECT status,count(*) AS n,min(created_at) AS oldest FROM outbox WHERE workspace=$1 GROUP BY status',
+        [workspace],
+      )
+    ).rows;
+    return {
+      pending: Number(rows.find((r) => r.status === 'pending')?.n ?? 0),
+      failed: Number(rows.find((r) => r.status === 'failed')?.n ?? 0),
+      delivered: Number(rows.find((r) => r.status === 'delivered')?.n ?? 0),
+      oldestPendingAt: rows.find((r) => r.status === 'pending')
+        ? Number(rows.find((r) => r.status === 'pending')!.oldest)
+        : null,
+    };
+  }
   async deliveries(workspace?: Workspace, dueAt?: number): Promise<Delivery[]> {
     const values: unknown[] = [],
       where = ['1=1'];
@@ -486,15 +566,31 @@ export class PostgresStore implements Storage {
       )
     ).rowCount;
   }
-  async publishAlert(alert: Alert, channelIds: string[]) {
+  async publishAlert(
+    alert: Alert,
+    channelIds: string[],
+    notification = {
+      key: alert.id,
+      type: 'firing' as Delivery['event_type'],
+      time: alert.createdAt,
+    },
+  ) {
     await this.withControl(async () => {
       await this.put('alert', alert);
       for (const channelId of channelIds)
         await this.sql(
-          "INSERT INTO outbox(id,workspace,alert_id,channel_id,status,next_at,created_at) VALUES($1,$2,$3,$4,'pending',$5,$5) ON CONFLICT DO NOTHING",
-          [randomUUID(), alert.workspace, alert.id, channelId, alert.createdAt],
+          "INSERT INTO outbox(id,workspace,alert_id,channel_id,status,next_at,created_at,event_key,event_type) VALUES($1,$2,$3,$4,'pending',$5,$5,$6,$7) ON CONFLICT DO NOTHING",
+          [
+            randomUUID(),
+            alert.workspace,
+            alert.id,
+            channelId,
+            notification.time,
+            notification.key,
+            notification.type,
+          ],
         );
-      await this.audit(alert.workspace, 'worker', 'alert.firing', alert.id);
+      await this.audit(alert.workspace, 'worker', 'alert.' + notification.type, alert.id);
     });
   }
   async close() {

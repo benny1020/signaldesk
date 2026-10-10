@@ -1,42 +1,23 @@
 # Roadmap and acceptance gates
 
-The [2026-10-09 comparison review](OSS_COMPARISON_REVIEW.md) leaves seven findings open. Implemented stages below describe the delivered baseline, not feature parity or production certification. Correctness repairs take precedence over additional features.
+Updated 2026-10-10 for v0.3. [Redesign](REDESIGN.md) records the implemented research follow-through. The original [OSS review](OSS_COMPARISON_REVIEW.md) remains historical; R1–R7 are repaired. Production parity is not inferred from fixtures or CI.
 
-| Stage                            | State                 | Acceptance / next gate                                                                                         |
-| -------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------------- |
-| v0.1 local baseline              | Implemented           | Native telemetry, correlated UI, alerts/incidents, AI evidence                                                 |
-| v0.2 multi-deployment            | Implemented           | Full resource identity, regional comparison, scoped drilldown, independent alert groups and retirement         |
-| v0.2 shared execution            | Implemented           | PostgreSQL, split API/worker roles, session task locks, concurrency and worker-loss tests                      |
-| Regional trace queue             | Implemented reference | Real pinned Collector JSON/gzip + persisted queue replay after outage/restart                                  |
-| Production regional availability | Deployment exercise   | Managed DB failover/PITR, WAN partitions, actual ingress recovery, load/volume budgets                         |
-| High-volume telemetry            | Planned               | ClickHouse/Prometheus/Loki/Tempo adapters, rollups/partitions, real engine conformance and measured throughput |
-| Service lifecycle/ingestion      | Partial               | Auto discovery/retirement, durable native log/metric path, full OTLP protobuf/metrics/logs and gRPC            |
-| Operations integrations          | Planned               | Native Slack/Telegram/PagerDuty payloads, escalation/on-call/status pages, real delivery receipts              |
-| AI assistance                    | Planned               | Opt-in provider, sanitized evidence, model/version audit, source-linked hypotheses and evaluation corpus       |
-| AI quality                       | Partial               | Supplied evaluation provenance implemented; evaluation runners/datasets/budget workflows planned               |
-| Enterprise access                | Planned               | SSO, org/project membership, managed tokens, independent role review                                           |
+| Scope                     | Delivered in v0.3                                                                                                                                          | Remaining acceptance                                                                                                  |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Investigation correctness | R1–R7: whole-window error buckets, child-region context, host/service discovery, proxy/health quota, URL history, partial traces, error identity           | Continued regression and real operator usability tasks                                                                |
+| Investigation UX          | Absolute bounds, KST/UTC, URL details, exact log restore, saved views, contextual facets, shared time drilldown, CSV/numeric charts, readable type/dialogs | Configurable tables, full field search/facets, synchronized hover, deploy/alert annotations, measured task completion |
+| Service ownership         | Stable service/team ID, aliases, runbook/repository, criticality/regions, unowned discovery                                                                | Cloud/HR discovery, automatic lifecycle and managed organizational membership                                         |
+| API/log analysis          | Retained SQL endpoint counts/errors/average/max, error heatmap/groups, partial trace listing                                                               | Span sampling coverage reconciled to complete request counters, high-cardinality query performance                    |
+| SLI/SLO                   | Shared revisioned observed-span definitions, minimum requests, availability/latency, budget and burn warnings, recovery/repeats                            | Multi-window burn, complete traffic denominator, merged histograms/recording rules                                    |
+| Notification operations   | Owner/dimension/severity routing, preview, maintenance, ACK/snooze actor/reason/expiry, separate firing/repeat/recovery receipts, multi-alert incidents    | Native Slack/Telegram/PagerDuty payloads, on-call/escalation, inhibition trees, status pages, real remote receipts    |
+| Service relationships     | Searchable evidence-based peer/queue/DB edge view and table, first/last window, coverage caveat                                                            | Kafka consumer lag/flowlog adapters, cache-specific telemetry, larger interactive topology                            |
+| AI monitoring             | Provider/model/prompt/stage versions, observed failure/TTFT/token/reported cost coverage                                                                   | Provider export compatibility, cost reconciliation/budgets, richer evaluator/score types                              |
+| AI quality                | Versioned structured dataset, actual candidate outcomes, exact-match runner, coverage, pinned baseline and regression                                      | Model/human semantic evaluation, experiment lifecycle and historical failure corpus                                   |
+| AIOps                     | Local evidence hypotheses; configured, explicit-opt-in HTTPS gateway; bounded source IDs, counter/missing evidence and next checks                         | External provider accuracy/cost/privacy acceptance; no automatic remediation                                          |
+| Ingestion resilience      | Standard JSON log/metric subsets, typed distribution metadata, Node single-writer fsync queue, regional persistent trace Collector                         | Full OTLP protobuf/gRPC, exponential histograms, point-label series engine, disk/power-loss stress and durable broker |
+| Platform health           | API ingest accept/reject, storage capacity, worker freshness/errors, full outbox pending/failed/delivered/age                                              | Backend write lag, aggregate query latency/failure budgets, regional end-to-end SLIs                                  |
+| Application execution     | Shared PostgreSQL, API/worker split, task ownership, connection-loss fencing, concurrent/restart/loss acceptance                                           | Real WAN partitions, managed primary failover/PITR, load and cardinality budgets                                      |
+| High-volume storage       | TelemetryStore/ControlStore separation and retained SQL baseline                                                                                           | ClickHouse/Mimir/Loki/Tempo adapters, partitions, rollups, adapter conformance and measured throughput                |
+| Access                    | Workspace admin/viewer/ingest tokens, privacy filtering, exact proxy trust                                                                                 | SSO, provisioning, managed org/projects, independent role review                                                      |
 
-| Review-driven next stage  | State   | Acceptance / next gate                                                                                                                                     |
-| ------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R1–R7 correctness         | Open    | Full-window heatmap, cross-region drilldown scope, host/service discovery, proxy/health quotas, URL back/forward, partial traces and error identity        |
-| Investigation UX          | Planned | Absolute time/timezone, URL selection, searchable facets, saved views, log histogram/context, configurable tables, trace search/sort and endpoint analysis |
-| Chart investigation       | Partial | Shared cursor/window, missing-data gaps, deployment/alert annotations, accessible zoom controls and chart data export                                      |
-| Notification operations   | Partial | Rule edit/version and group state; label routing, maintenance/inhibition, recovery/repeat delivery, real on-call escalation                                |
-| SLO and server aggregates | Planned | Traffic-based SLI, histogram aggregation, budget/burn-rate and backend-wide aggregates rather than capped client samples                                   |
-| AI evaluation operations  | Planned | Multiple versioned scores, dataset/experiment baseline, evaluation coverage and privacy-compatible runners                                                 |
-
-No external remediation, production failover or high-volume certification is inferred from local acceptance. See [multi-region responsibilities](MULTI_REGION.md).
-
-## Daangn and Toss research follow-through
-
-The [2026-10-10 company research](DAANGN_TOSS_RESEARCH.md) adds the following planned acceptance criteria. R1–R7 correctness repairs remain first. These requirements have not been implemented by the research commit.
-
-| Requirement                        | State   | Acceptance / next gate                                                                                                                          |
-| ---------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Service catalog and ownership      | Planned | Stable service/team IDs; owner, runbook, repository, criticality and supported regions; explicit orphan ownership                               |
-| Actionable notification flow       | Planned | Owner-aware routing, absolute investigation links, distinct ACK/snooze/resolve, actor/expiry/reason audit, repeat/recovery delivery receipts    |
-| Shared SLI definitions             | Planned | Versioned query definitions shared by UI and rules; traffic-weighted success, merged histograms, freshness and evaluation failure               |
-| Asynchronous service relationships | Planned | Queue/Kafka/DB/cache adapters; evidence, observation window and coverage per edge; searchable graph and equivalent table                        |
-| Observability platform health      | Planned | Ingest refusal/drop, queue age/depth, write lag, query limit/failure/latency and regional degradation visibility                                |
-| Measured investigation usability   | Planned | Operator tasks for alert ownership, API/log/trace correlation, URL restoration and missing-data interpretation; measured success/time/errors    |
-| AI failure feedback loop           | Planned | Structured failure categories linked to evaluator, dataset, prompt/model versions; evidence-backed assistance evaluated on historical incidents |
+Use [verification](VERIFICATION.md), [operations](OPERATIONS.md) and [regional deployment gates](MULTI_REGION.md) before an operating rollout. No production infrastructure, notification recipient or model provider was provisioned by this task.

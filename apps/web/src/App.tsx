@@ -1,3 +1,13 @@
+import {
+  Catalog,
+  ServiceLevels,
+  NotificationPolicies,
+  Relationships,
+  OperationalAnalysis,
+  AIOperations,
+  APIAnalysis,
+  PlatformHealth,
+} from './Investigation';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -27,6 +37,7 @@ import type {
   Alert,
   ResourceSummary,
   Page,
+  Log,
 } from '../../../packages/contracts/src/index';
 import {
   Overview,
@@ -49,6 +60,37 @@ import { CreateForm } from './Forms';
 import { Detail } from './Detail';
 import { request, queryString } from './api';
 const navigation = [
+  {
+    key: 'platform',
+    name: '플랫폼 상태',
+    icon: ShieldAlert,
+    description: '현재 수집·저장·평가·전달 상태를 확인합니다.',
+  },
+  {
+    key: 'catalog',
+    name: '서비스 카탈로그',
+    icon: Boxes,
+    description: '서비스 담당 팀과 운영 자료를 연결합니다.',
+  },
+  {
+    key: 'slos',
+    name: '서비스 수준',
+    icon: ShieldAlert,
+    description: '공통 SLI와 오류 예산을 평가합니다.',
+  },
+  {
+    key: 'policies',
+    name: '전달 정책',
+    icon: Bell,
+    description: '담당 팀별 라우팅과 유지보수 시간을 관리합니다.',
+  },
+  {
+    key: 'relations',
+    name: '서비스 관계',
+    icon: GitBranch,
+    description: '메시징과 데이터베이스까지 관측 근거로 탐색합니다.',
+  },
+
   {
     key: 'overview',
     name: '대시보드',
@@ -115,18 +157,82 @@ const navigation = [
     icon: Plug,
     description: '데이터 수집, 알림 채널과 API 검사를 연결합니다.',
   },
-];
+].sort(
+  (a, b) =>
+    [
+      'overview',
+      'services',
+      'catalog',
+      'deployments',
+      'hosts',
+      'logs',
+      'traces',
+      'alerts',
+      'incidents',
+      'slos',
+      'policies',
+      'analytics',
+      'relations',
+      'ai',
+      'platform',
+      'connections',
+    ].indexOf(a.key) -
+    [
+      'overview',
+      'services',
+      'catalog',
+      'deployments',
+      'hosts',
+      'logs',
+      'traces',
+      'alerts',
+      'incidents',
+      'slos',
+      'policies',
+      'analytics',
+      'relations',
+      'ai',
+      'platform',
+      'connections',
+    ].indexOf(b.key),
+);
+function AIWorkspace(p: PageProps) {
+  const [details, setDetails] = useState(false);
+  return (
+    <>
+      <AIOperations {...p} />
+      <button
+        className="button secondary"
+        onClick={() => setDetails(!details)}
+        aria-expanded={details}
+      >
+        {details ? '개별 호출 근거 접기' : '개별 호출·토큰·평가 근거 펼치기'}
+      </button>
+      {details && <AIWorkloads {...p} />}
+    </>
+  );
+}
 const pages: Record<string, (p: PageProps) => React.ReactNode> = {
   overview: Overview,
   deployments: Deployments,
-  services: Services,
+  services: (p) => (
+    <>
+      <Services {...p} />
+      <APIAnalysis {...p} />
+    </>
+  ),
   hosts: Infrastructure,
   logs: Logs,
   traces: Traces,
   alerts: Alerts,
   incidents: Incidents,
-  analytics: Analytics,
-  ai: AIWorkloads,
+  analytics: OperationalAnalysis,
+  catalog: Catalog,
+  platform: PlatformHealth,
+  slos: ServiceLevels,
+  policies: NotificationPolicies,
+  relations: Relationships,
+  ai: AIWorkspace,
   connections: ConnectionsPage,
 };
 export default function App() {
@@ -140,7 +246,32 @@ export default function App() {
     [toast, setToast] = useState(''),
     [searchOpen, setSearchOpen] = useState(false),
     [search, setSearch] = useState(''),
-    [loginToken, setLoginToken] = useState('');
+    [loginToken, setLoginToken] = useState(''),
+    [timeOpen, setTimeOpen] = useState(false),
+    [fromInput, setFromInput] = useState(''),
+    [toInput, setToInput] = useState(''),
+    [savedViews, setSavedViews] = useState<{ name: string; query: string }[]>(() => {
+      try {
+        return JSON.parse(localStorage.getItem('signaldesk-views') ?? '[]');
+      } catch {
+        return [];
+      }
+    });
+  const saveView = () => {
+    const name = prompt('저장할 조사 화면 이름');
+    if (!name?.trim()) return;
+    const query = new URLSearchParams(location.search);
+    if (!query.has('from') && dashboard.data) {
+      query.set('from', String(dashboard.data.window.from));
+      query.set('to', String(dashboard.data.window.to));
+    }
+    const next = [
+      ...savedViews.filter((v) => v.name !== name),
+      { name: name.trim(), query: query.toString() },
+    ].slice(-20);
+    localStorage.setItem('signaldesk-views', JSON.stringify(next));
+    setSavedViews(next);
+  };
   const client = useQueryClient(),
     workspace = url.get('workspace') === 'live' ? 'live' : 'demo',
     page = pages[url.get('page') ?? ''] ? url.get('page')! : 'overview',
@@ -150,6 +281,7 @@ export default function App() {
   const params = useMemo(
     () => ({
       workspace,
+      route: url.get('route') || undefined,
       ...Object.fromEntries(dimensionKeys.map((key) => [key, url.get(key) || undefined])),
       environment: env || undefined,
       service: service || undefined,
@@ -162,14 +294,18 @@ export default function App() {
   const bootstrap = useQuery({
     queryKey: ['bootstrap', workspace],
     queryFn: () =>
-      request<{ mode: string; demoNow: number; version: string }>(
-        '/api/bootstrap?workspace=' + workspace,
-      ),
+      request<{
+        mode: string;
+        demoNow: number;
+        version: string;
+        diagnosisDestination?: string | null;
+      }>('/api/bootstrap?workspace=' + workspace),
     retry: false,
   });
   const dashboard = useQuery({
     queryKey: ['dashboard', params],
-    queryFn: () => request<Dashboard>('/api/dashboard?' + queryString(params)),
+    queryFn: ({ signal }) =>
+      request<Dashboard>('/api/dashboard?' + queryString(params), { signal }),
     enabled: bootstrap.isSuccess,
     refetchInterval: paused ? false : 5000,
   });
@@ -180,10 +316,33 @@ export default function App() {
     enabled: bootstrap.isSuccess,
     refetchInterval: paused ? false : 10000,
   });
+  const selectedLog = useQuery({
+    queryKey: ['selected-log', url.get('detailId'), params],
+    enabled: bootstrap.isSuccess && url.get('detail') === 'log' && !!url.get('detailId'),
+    queryFn: () =>
+      request<Log>(
+        '/api/events/log/' +
+          encodeURIComponent(url.get('detailId') ?? '') +
+          '?' +
+          queryString(params),
+      ),
+    retry: false,
+  });
   const current = navigation.find((n) => n.key === page)!,
     PageComponent = pages[page];
   const update = useCallback((patch: Record<string, string | undefined>, replace = false) => {
     const next = new URLSearchParams(location.search);
+    if (
+      !Object.hasOwn(patch, 'detail') &&
+      ['workspace', 'service', 'environment', ...dimensionKeys, 'from', 'to'].some((key) =>
+        Object.hasOwn(patch, key),
+      )
+    ) {
+      next.delete('detail');
+      next.delete('detailId');
+      setSelection(null);
+      if (!Object.hasOwn(patch, 'route')) next.delete('route');
+    }
     for (const [key, value] of Object.entries(patch)) {
       if (value === undefined || value === '') next.delete(key);
       else next.set(key, value);
@@ -191,8 +350,54 @@ export default function App() {
     history[replace ? 'replaceState' : 'pushState'](null, '', '?' + next.toString());
     setUrl(next);
   }, []);
+  const select = (value: Selection | null) => {
+    setSelection(value);
+    update({
+      ...(value && !url.get('from') && dashboard.data
+        ? { from: String(dashboard.data.window.from), to: String(dashboard.data.window.to) }
+        : {}),
+      detail: value?.type,
+      detailId:
+        value?.type === 'trace'
+          ? value.id
+          : value?.type === 'service'
+            ? value.name
+            : value?.type === 'log'
+              ? value.log.id
+              : value?.type === 'incident'
+                ? value.incident.id
+                : undefined,
+    });
+  };
+  useEffect(() => {
+    document
+      .querySelector('.sidebar nav [aria-current="page"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [page, bootstrap.isSuccess]);
+  useEffect(() => {
+    const type = url.get('detail'),
+      id = url.get('detailId');
+    if (type === 'trace' && id) setSelection({ type: 'trace', id });
+    else if (type === 'service' && id) setSelection({ type: 'service', name: id });
+    else if (type === 'briefing') setSelection({ type: 'briefing' });
+    else if (type === 'log' && id) {
+      const log = selectedLog.data ?? dashboard.data?.logs.find((l) => l.id === id);
+      if (log) setSelection({ type: 'log', log });
+    } else if (type === 'incident' && id) {
+      const incident = dashboard.data?.incidents.find((i) => i.id === id);
+      if (incident) setSelection({ type: 'incident', incident });
+    } else setSelection(null);
+  }, [url.toString(), dashboard.data, selectedLog.data]);
   const navigate = (next: string, s?: string) => {
-    update({ page: next, ...(s !== undefined ? { service: s } : {}) });
+    update({
+      page: next,
+      detail: undefined,
+      detailId: undefined,
+      search: undefined,
+      level: undefined,
+      route: undefined,
+      ...(s !== undefined ? { service: s } : {}),
+    });
     setSelection(null);
   };
   useEffect(() => {
@@ -236,11 +441,16 @@ export default function App() {
     ? {
         data: dashboard.data,
         params,
-        select: setSelection,
+        select,
         navigate,
         focusResource: (r, next = 'logs') => {
           update({
             page: next,
+            detail: undefined,
+            detailId: undefined,
+            search: undefined,
+            level: undefined,
+            route: undefined,
             service: r.service,
             environment: r.environment,
             ...Object.fromEntries(dimensionKeys.map((key) => [key, r[key]])),
@@ -250,10 +460,13 @@ export default function App() {
         mutate,
         openForm: (kind, alert) => setForm({ kind, alert }),
         paused,
+        updateScope: update,
+        onRange: (from, to) => update({ from: String(from), to: String(to) }),
         notify: setToast,
       }
     : undefined;
-  const errors = (bootstrap.error ?? dashboard.error) as (Error & { status?: number }) | null;
+  const errors = (bootstrap.error ?? dashboard.error ?? selectedLog.error) as
+    (Error & { status?: number }) | null;
   if (errors?.status === 401)
     return (
       <div className="login">
@@ -335,8 +548,19 @@ export default function App() {
           <span>서비스 빠른 이동</span>
           <kbd>⌘ K</kbd>
         </button>
+        <label className="sidebar-timezone">
+          표시 시간대{' '}
+          <select
+            aria-label="표시 시간대"
+            value={url.get('timezone') === 'UTC' ? 'UTC' : 'Asia/Seoul'}
+            onChange={(e) => update({ timezone: e.target.value })}
+          >
+            <option value="Asia/Seoul">한국 · UTC+09</option>
+            <option value="UTC">UTC</option>
+          </select>
+        </label>
         <nav aria-label="주 메뉴">
-          {navigation.map((item, i) => (
+          {navigation.map((item) => (
             <a
               key={item.key}
               aria-label={item.name}
@@ -356,7 +580,6 @@ export default function App() {
                 !!dashboard.data?.alerts.filter((a) => a.status === 'firing').length && (
                   <b>{dashboard.data.alerts.filter((a) => a.status === 'firing').length}</b>
                 )}
-              {i === 8 && <span className="new-dot" />}
             </a>
           ))}
         </nav>
@@ -367,7 +590,7 @@ export default function App() {
           <div>
             <span className="operator-avatar">OP</span>
             <span>
-              Operations workspace<small>v0.2.0</small>
+              Operations workspace<small>v0.3.0</small>
             </span>
           </div>
         </div>
@@ -426,6 +649,18 @@ export default function App() {
             </select>
           </div>
           <div className="context-right">
+            <button
+              className="button secondary"
+              onClick={() => {
+                const f = dashboard.data?.window.from ?? Date.now() - 3600000,
+                  t = dashboard.data?.window.to ?? Date.now();
+                setFromInput(new Date(f).toISOString().slice(0, 16));
+                setToInput(new Date(t).toISOString().slice(0, 16));
+                setTimeOpen(true);
+              }}
+            >
+              {url.has('from') ? '고정 시간 (UTC)' : '시간 지정 (UTC)'}
+            </button>
             <select
               aria-label="시간 범위"
               value={range}
@@ -472,7 +707,7 @@ export default function App() {
                 <button
                   className="button secondary"
                   disabled={!props}
-                  onClick={() => setSelection({ type: 'briefing' })}
+                  onClick={() => select({ type: 'briefing' })}
                 >
                   <Sparkles size={15} /> 근거 브리핑
                 </button>
@@ -536,13 +771,39 @@ export default function App() {
             <>
               {props.data.truncated && (
                 <div className="notice">
-                  조회 상한 내 표본이 표시됩니다. 전체 분석이 필요하면 시간 범위를 좁히세요. 로그는
-                  다음 페이지로 더 탐색할 수 있습니다.
+                  목록은 조회 상한 내 표본입니다. 차트·API·오류 분석은 보존된 전체 시간 범위를
+                  집계하며 그룹 상한을 별도로 표시합니다. 로그는 다음 페이지로 더 탐색할 수
+                  있습니다.
                 </div>
               )}
               <PageComponent {...props} />
             </>
           )}
+          <div className="saved-view-bar">
+            <button className="text-button" onClick={saveView}>
+              현재 조사 저장
+            </button>
+            {savedViews.map((v) => (
+              <button
+                className="scope-chip"
+                key={v.name}
+                onClick={() => {
+                  history.pushState(null, '', '?' + v.query);
+                  setUrl(new URLSearchParams(v.query));
+                }}
+              >
+                {v.name}
+              </button>
+            ))}
+            {url.has('from') && (
+              <button
+                className="text-button"
+                onClick={() => update({ from: undefined, to: undefined })}
+              >
+                실시간 범위로 복귀
+              </button>
+            )}
+          </div>
           <footer className="workspace-footer">
             <span>
               {workspace === 'demo' ? '고정 예제 데이터' : '현재 수집 데이터'}
@@ -554,6 +815,61 @@ export default function App() {
           </footer>
         </main>
       </div>
+      {timeOpen && (
+        <Dialog title="조사 시간 지정 (UTC)" onClose={() => setTimeOpen(false)}>
+          <form
+            className="form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const from = Date.parse(fromInput + 'Z'),
+                to = Date.parse(toInput + 'Z');
+              if (
+                !Number.isFinite(from) ||
+                !Number.isFinite(to) ||
+                from > to ||
+                to - from > 7 * 86400000
+              ) {
+                setToast('시간은 순서대로, 최대 7일 범위로 지정하세요.');
+                return;
+              }
+              update({ from: String(from), to: String(to) });
+              setTimeOpen(false);
+            }}
+          >
+            <label>
+              시작 UTC
+              <input
+                required
+                type="datetime-local"
+                value={fromInput}
+                onChange={(e) => setFromInput(e.target.value)}
+              />
+            </label>
+            <label>
+              종료 UTC
+              <input
+                required
+                type="datetime-local"
+                value={toInput}
+                onChange={(e) => setToInput(e.target.value)}
+              />
+            </label>
+            <label>
+              표시 시간대
+              <select
+                aria-label="조사 표시 시간대"
+                value={url.get('timezone') === 'UTC' ? 'UTC' : 'Asia/Seoul'}
+                onChange={(e) => update({ timezone: e.target.value })}
+              >
+                <option value="Asia/Seoul">한국 · UTC+09</option>
+                <option value="UTC">UTC</option>
+              </select>
+            </label>
+            <p className="muted">입력 범위는 UTC이며 로그와 차트는 선택한 시간대로 표시합니다.</p>
+            <button className="button">시간 적용</button>
+          </form>
+        </Dialog>
+      )}
       {toast && (
         <div className="toast" role="status">
           {toast}
@@ -584,7 +900,7 @@ export default function App() {
           }
           {...props}
           selection={selection}
-          onClose={() => setSelection(null)}
+          onClose={() => select(null)}
         />
       )}{' '}
       {searchOpen && (
@@ -607,7 +923,7 @@ export default function App() {
                   key={s.name + s.environment}
                   onClick={() => {
                     setSearchOpen(false);
-                    setSelection({ type: 'service', name: s.name });
+                    select({ type: 'service', name: s.name });
                   }}
                 >
                   <Boxes size={17} />

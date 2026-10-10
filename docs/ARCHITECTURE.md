@@ -3,13 +3,13 @@
 ```mermaid
 flowchart LR
   Producer[Resource-labelled metrics / logs] --> API[API replicas: validation + scoped access]
-  Collector[Regional Collector + persistent trace queue] --> API
+  Collector[Regional Collector / durable Node producer] --> API
   UI[React workspace + deployment filters] --> API
   API --> Storage[TelemetryStore + ControlStore]
   Workers[Worker replicas] --> Storage
   Storage --> PG[PostgreSQL: shared production baseline]
   Storage --> SQLite[SQLite WAL: local combined process]
-  Workers --> Tasks[Rule / probe / delivery task locks]
+  Workers --> Tasks[Rule / SLO / probe / delivery task locks]
   Tasks --> Outbox[Atomic alert + delivery outbox]
   Outbox --> HTTPS[Bounded HTTPS sender]
 ```
@@ -18,7 +18,7 @@ flowchart LR
 
 `packages/contracts/src/resource.ts` defines resource identity and selectors. Workspace is the access partition; service/environment/module/region/zone/cluster/namespace/instanceId form the resource tuple. Storage hashes its JSON tuple for a stable registry ID. Absent legacy dimensions become `unknown`; no geography is guessed. Production ingestion can require module, region and instance ID.
 
-`TelemetryStore` owns atomic append, bounded scoped query, exact trace lookup, latest per-resource gauges, inventory, capacity and retention. `ControlStore` owns rules, group state, alerts, incidents, settings, worker heartbeat, audit and delivery transactions. `Storage` combines them. SQLite and PostgreSQL implement these ports; an external telemetry adapter can be injected without replacing control contracts. Full remote Prometheus/Loki/Tempo/ClickHouse adapters remain planned.
+`TelemetryStore` owns atomic append, bounded scoped query, exact trace lookup, latest per-resource gauges, inventory, capacity, retention and optional full-scope aggregate queries. `ControlStore` owns rules, group state, alerts, incidents, settings, worker heartbeat, audit and delivery transactions. `Storage` combines them. SQLite and PostgreSQL implement these ports; an external telemetry adapter can be injected without replacing control contracts. Full remote Prometheus/Loki/Tempo/ClickHouse adapters remain planned.
 
 PostgreSQL stores raw JSONB events with indexed workspace/kind/time/service/environment/resource columns. An indexed latest-metric table avoids scanning full retention for evaluation. Registry keeps first/last seen and explicit retirement. Late events preserve history without overwriting newer values. Ingestion validates the entire batch, strips sensitive attributes, deduplicates `(workspace,id)`, updates registry/latest gauges and capacity in one transaction. Cardinality/capacity rejection rolls back the whole batch. Historical latest queries use bounded indexed selection when newer reports exist.
 
@@ -41,3 +41,17 @@ Every operational query scopes workspace and all selected deployment fields. Exa
 Local mode binds loopback. Token mode uses workspace-scoped admin/viewer/ingest tokens. HTTPS, managed secrets and deliberate proxy trust are deployment responsibilities. Gzip requests are decompressed with a 1 MiB **expanded** body limit. Webhook/probe requests pin validated DNS and reject redirects/private destinations unless specifically allowlisted. AI cost requires producer provenance; prompt and tool bodies are stripped. SSO and universal PII detection are not implemented.
 
 See [regional failure design](MULTI_REGION.md) and [operations](OPERATIONS.md) for deployment constraints.
+
+## v0.3 operations and extension boundaries
+
+`aggregate.ts` is a bound-parameter SQLite/PostgreSQL query planner. Only enumerated internal field names enter SQL; user selectors are values. It scans retained telemetry for RED bucket curves, log buckets, exact error identities, server/root endpoint and SLI counts, trace groups, AI versions and observed dependency attributes. Results expose source/window/step/truncation; 1,000 groups is a display bound, not proof that everything is present. SLI is an ungrouped denominator and has no 1,000-span dashboard cap. Missing gauge pairs produce unknown rather than a low biased error rate.
+
+`operations.ts` owns revisioned service/team catalog, notification routes, maintenance, SLO definitions, versioned datasets and evaluation runs. Catalog aliases resolve a telemetry name to a stable service/team identity. Detection calls notificationPlan only after deciding alert state; the policy selects owner/dimension/severity channels and maintenance suppression. Delivery rechecks current policy. Outbox key is event_key/channel rather than alert/channel so repeat and recovery have independent durable receipts. Demo is an enforced no-transmission partition.
+
+`evaluateSLO` is shared by API status and worker evaluation. Server/root spans are observed requests, error status/5xx is availability failure and latency thresholds count durations above the definition. Worker task ownership/revision checks fence concurrent configuration edits. Minimum coverage is explicit. No multi-window burn model, merged population histogram or cross-region database consensus is implied.
+
+`diagnosis.ts` owns bounded evidence extraction, deterministic local hypotheses and a replaceable HTTPS model-gateway contract. External network work runs outside the global control lock. Structured outputs must cite current authorized evidence IDs, include counter/missing evidence and a next check. Gateway configuration plus explicit admin opt-in controls transmission. Dataset evaluation is a separate deterministic field matcher; missing candidate cases/fields reduce coverage. Neither component changes servers or incident status.
+
+Frontend investigation modules live in `apps/web/src/investigation`; shared query/form helpers are separate. App URL is the investigation state: resource/time/search/detail/timezone. Selecting a detail freezes absolute bounds, log restoration uses exact scoped ID lookup and trace lookup expands cross-region children deliberately. Each chart can narrow the shared time range and export visible numeric series. Hover cursors and deployment annotations are not yet synchronized across all charts.
+
+The SQL baseline is horizontally scalable at the application tier but remains correctness-first at the database tier: single write authority, capacity row serialization, raw JSONB, no telemetry partitioning/rollups or ClickHouse/Mimir adapter. Contracts permit separate telemetry/control injection; adapter conformance and realistic volume measurement are still required before replacing the storage implementation. Durable Node journals are bounded single-process producers, not a distributed ingestion broker.

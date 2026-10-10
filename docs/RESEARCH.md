@@ -1,5 +1,7 @@
 # Research and decisions · 2026-10-09
 
+> v0.3 follow-through (2026-10-10): R1–R7 are repaired and the service/notification/SLI/AI redesign is implemented within documented bounds. The report below preserves its original research-time findings. Current state: [redesign](REDESIGN.md), [verification](VERIFICATION.md), [roadmap](ROADMAP.md).
+
 ## Korean engineering practice review · 2026-10-10
 
 [Daangn and Toss research](DAANGN_TOSS_RESEARCH.md) examines official monitoring, AlertDelivery, service ownership, multi-cluster, SLI, log-pipeline, service-relationship, UX and AI operations material. The report separates historical team-specific evidence from proposed SignalDesk requirements. Seven official presentation PDFs and six pinned GitHub repositories are tracked in the [source registry](research/company-sources.json). These are research additions; runtime changes and the seven open correctness findings are not resolved by this review.

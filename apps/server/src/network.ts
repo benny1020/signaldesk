@@ -39,7 +39,8 @@ export async function safeRequest(
   raw: string,
   body?: unknown,
   allowedHosts: string[] = [],
-): Promise<{ status: number; durationMs: number }> {
+  extraHeaders: Record<string, string> = {},
+): Promise<{ status: number; durationMs: number; body?: string }> {
   const url = new URL(raw);
   if (url.protocol !== 'https:' || url.username || url.password)
     throw new Error('Use an HTTPS URL without user credentials');
@@ -70,17 +71,24 @@ export async function safeRequest(
       lookup: (_host, _options, cb) => cb(null, chosen.address, chosen.family),
       headers: payload
         ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(payload) }
-        : { 'user-agent': 'SignalDesk/0.1' },
+        : { 'user-agent': 'SignalDesk/0.3' },
     };
+    options.headers = { ...options.headers, ...extraHeaders };
     const req = https.request(url, options, (res) => {
       let bytes = 0;
+      const chunks: Buffer[] = [];
       res.on('data', (chunk: Buffer) => {
         bytes += chunk.length;
         if (bytes > 65536) res.destroy(new Error('Response exceeded 64 KiB'));
+        else chunks.push(chunk);
       });
       res.on('error', reject);
       res.on('end', () =>
-        resolve({ status: res.statusCode ?? 0, durationMs: performance.now() - start }),
+        resolve({
+          status: res.statusCode ?? 0,
+          durationMs: performance.now() - start,
+          body: Buffer.concat(chunks).toString('utf8'),
+        }),
       );
     });
     req.on('timeout', () => req.destroy(new Error('Destination timed out')));

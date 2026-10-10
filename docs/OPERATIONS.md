@@ -52,3 +52,46 @@ For PostgreSQL, use managed backups/PITR or consistent `pg_dump` and keep CHANNE
 Use [multi-region design](MULTI_REGION.md) for regional queues, UID/volume setup, failover responsibilities, pool budgets and volume estimates. Resource retirement preserves records and stops evaluation on the next successful worker tick. Registry is operator-managed; cloud discovery and auto-retirement are planned. Dashboard inventory/filter options cap at 10,000 and current alert snapshots at 1,000; narrowing a scope is required above those limits.
 
 The API is not production load-certified. Local Docker tests prove shared-state and recovery behavior under their fixture conditions, not WAN/database-HA guarantees.
+
+## v0.3 upgrade and notification policy
+
+Back up telemetry/control storage and CHANNEL_KEY before upgrading. Stop all old workers/APIs for this schema transition, deploy one v0.3 process to migrate, verify the restored/scoped records, then start replicas. SQLite migration 3 rebuilds outbox while preserving v0.2 receipts; PostgreSQL adds event_key/event_type and replaces the old alert/channel unique constraint. Firing, repeat and recovery have separate idempotency keys. Old binaries are not a supported rollback against the migrated outbox: restore the matching backup into a separate database and verify before traffic cutover. No existing production database is upgraded by this development task.
+
+New control kinds are capped at 1,000/workspace; dataset cases at 500 and linked incident alerts at 100. Configure routes before depending on them: no policies means legacy broadcast, any configured policy switches to explicit matches, and all disabled means no transmission. Preview owner/channel/maintenance selection before rollout. ACK, snooze, maintenance and incident state are separate. Delivery depth/age is queried across the entire outbox; the receipt list still shows 100 records. Demo destinations simulate preview only and never send.
+
+## Trusted ingress and synthetic vantage
+
+`TRUSTED_PROXIES` is a comma-separated exact IP/CIDR list, empty by default. It is passed to Fastify's trustProxy. Trust only your own ingress and sanitize forwarded headers there. `/health` bypasses application quota. The distributed example gives Nginx the fixed IP `172.31.240.10` on `172.31.240.0/24`; change both subnet/IP and trust setting together if that subnet conflicts. Arbitrary forwarded headers from a direct client cannot select its quota identity.
+
+A probe's `vantageRegion` selects workers by their actual REGION. Leave it unset for the first eligible worker. Record the observed vantage/worker with each result; do not treat labels in a one-host Compose exercise as geographic availability. The default distributed workers carry Seoul and Virginia labels. If no eligible worker exists the check is stale; there is no implicit region failover.
+
+## Durable Node producer
+
+```js
+import { DurableSignalDeskClient } from './packages/sdk/node.js';
+const client = new DurableSignalDeskClient({
+  endpoint: 'http://127.0.0.1:4319',
+  token: process.env.SIGNALDESK_INGEST_TOKEN,
+  queuePath: '/var/lib/orders/telemetry.json',
+  workspace: 'live',
+  resource: { module: 'api', region: 'ap-northeast-2', instanceId: process.env.INSTANCE_ID },
+});
+client.emit({
+  service: 'orders',
+  environment: 'production',
+  kind: 'metric',
+  name: 'error_pct',
+  value: 0.4,
+  timestamp: Date.now(),
+});
+await client.flush();
+client.close();
+```
+
+The journal uses restrictive permissions, atomic rename, file/directory fsync and a PID single-writer lock. Reopening replays stable IDs; storage deduplicates them. Endpoint/workspace mismatch and corrupt journals fail closed. Token is not written to disk; sensitive attribute keys and credential patterns are redacted before persistence. Protect and encrypt its volume as needed: arbitrary sensitive log text is not universally detectable.
+
+Call flush until queue empties during graceful shutdown, then close; close itself preserves unsent events. A stale PID lock is recoverable; a live owner or incomplete lock requires operator investigation. Capacity counts queued plus in-flight events; emit returns false and increments dropped when full. Monitor dropped and disk capacity. Journal rewrite is synchronous and proportional to bounded queue size, intended for a pilot producer, not a high-volume broker. Close/reopen replay is tested; power-loss/disk-corruption/whole-volume loss is not certified. Regional Collector traces remain a separate tested durable path.
+
+## Optional diagnosis gateway
+
+Default off. Set `AI_DIAGNOSIS_ENABLED=true`, `AI_DIAGNOSIS_URL` to an approved HTTPS endpoint and `AI_DIAGNOSIS_TOKEN` through secret management. The same DNS/egress/timeout/64 KiB response limits as other outbound calls apply. UI discloses the destination and requires per-request opt-in; external requests require admin. Counts, service identifiers and observation times may still be sensitive, so choose a destination authorized for them. Raw logs, prompts and tool bodies are excluded. Gateway contract is in API.md. No external model was called during acceptance and no automatic resource changes exist.

@@ -1,3 +1,5 @@
+import { notificationPlan, evaluateSLO } from './operations.ts';
+import type { SLO } from '../../../packages/contracts/src/index.ts';
 import { randomUUID, createHash } from 'node:crypto';
 import {
   dimensionKeys,
@@ -31,6 +33,9 @@ export type Probe = ResourceSelector & {
   environment: string;
   url: string;
   enabled: boolean;
+  vantageRegion?: string;
+  lastVantageRegion?: string;
+  lastWorkerId?: string;
   lastRun: number | null;
   lastStatus: number | null;
   lastDurationMs: number | null;
@@ -171,7 +176,12 @@ export class Engine {
         const resolve = async (a: Alert) => {
           a.status = 'resolved';
           a.resolvedAt = now;
-          await this.store.put('alert', a);
+          const plan = await notificationPlan(this.store, a, now, true);
+          await this.store.publishAlert(a, plan.channelIds, {
+            key: a.id + ':recovery',
+            type: 'recovery',
+            time: now,
+          });
           await this.store.audit(workspace, 'worker', 'alert.resolved', a.id);
         };
         for (const a of alerts)
@@ -234,7 +244,22 @@ export class Engine {
               if (active?.status === 'firing') {
                 active.value = value;
                 active.reason = noData ? 'no_data' : 'threshold';
-                await this.store.put('alert', active);
+                const plan = await notificationPlan(this.store, active, now);
+                if (
+                  !active.acknowledged &&
+                  active.snoozedUntil <= now &&
+                  (active.lastNotifiedAt === undefined ||
+                    now - active.lastNotifiedAt >= plan.repeatMinutes * 60000) &&
+                  plan.channelIds.length
+                ) {
+                  active.notificationSequence = (active.notificationSequence ?? 0) + 1;
+                  active.lastNotifiedAt = now;
+                  await this.store.publishAlert(active, plan.channelIds, {
+                    key: active.id + ':repeat:' + active.notificationSequence,
+                    type: 'repeat',
+                    time: now,
+                  });
+                } else await this.store.put('alert', active);
               } else if (now - state.pendingSince >= rule.durationSec * 1000) {
                 const alert: Alert = {
                   id: randomUUID(),
@@ -254,10 +279,9 @@ export class Engine {
                   acknowledged: false,
                   snoozedUntil: 0,
                 };
-                const channels = (await this.store.list<Channel>('channel', workspace))
-                  .filter((c) => c.enabled)
-                  .map((c) => c.id);
-                await this.store.publishAlert(alert, channels);
+                const plan = await notificationPlan(this.store, alert, now);
+                alert.lastNotifiedAt = plan.channelIds.length ? now : undefined;
+                await this.store.publishAlert(alert, plan.channelIds);
               }
             }
             state.lastSeen = now;
@@ -275,6 +299,72 @@ export class Engine {
         });
       });
   }
+  async evaluateSLOs(workspace: Workspace, now = Date.now()) {
+    for (const definition of (await this.store.list<SLO>('slo', workspace)).filter(
+      (s) => s.enabled,
+    ))
+      await this.store.withWorker('slo:' + definition.id, async () => {
+        const result = await evaluateSLO(this.telemetry, definition, now);
+        await this.store.withControl(async () => {
+          const current = await this.store.get<SLO>('slo', definition.id, workspace);
+          if (!current?.enabled || current.revision !== definition.revision) return;
+          const active = (await this.store.alerts(workspace, 'slo:' + definition.id))[0];
+          if (result.status === 'violated' && !active) {
+            const alert: Alert = {
+              id: randomUUID(),
+              workspace,
+              ruleId: 'slo:' + definition.id,
+              groupKey: 'service',
+              title: definition.name + ' error budget burn',
+              service: definition.service,
+              environment: definition.environment,
+              ...Object.fromEntries(
+                dimensionKeys.filter((k) => definition[k]).map((k) => [k, definition[k]]),
+              ),
+              severity: 'warning',
+              status: 'firing',
+              reason: 'threshold',
+              value: result.burnRate,
+              createdAt: now,
+              resolvedAt: null,
+              acknowledged: false,
+              snoozedUntil: 0,
+            };
+            const plan = await notificationPlan(this.store, alert, now);
+            alert.lastNotifiedAt = plan.channelIds.length ? now : undefined;
+            alert.notificationSequence = 0;
+            await this.store.publishAlert(alert, plan.channelIds);
+          } else if (active && result.status === 'violated') {
+            active.value = result.burnRate;
+            const plan = await notificationPlan(this.store, active, now);
+            if (
+              !active.acknowledged &&
+              active.snoozedUntil <= now &&
+              plan.channelIds.length &&
+              (active.lastNotifiedAt === undefined ||
+                now - active.lastNotifiedAt >= plan.repeatMinutes * 60000)
+            ) {
+              active.notificationSequence = (active.notificationSequence ?? 0) + 1;
+              active.lastNotifiedAt = now;
+              await this.store.publishAlert(active, plan.channelIds, {
+                key: active.id + ':repeat:' + active.notificationSequence,
+                type: 'repeat',
+                time: now,
+              });
+            } else await this.store.put('alert', active);
+          } else if (active && result.status === 'healthy') {
+            active.status = 'resolved';
+            active.resolvedAt = now;
+            const plan = await notificationPlan(this.store, active, now, true);
+            await this.store.publishAlert(active, plan.channelIds, {
+              key: active.id + ':recovery',
+              type: 'recovery',
+              time: now,
+            });
+          }
+        });
+      });
+  }
   async deliver(now = Date.now()) {
     for (const candidate of await this.store.deliveries(undefined, now))
       await this.store.withWorker('delivery:' + candidate.id, async () => {
@@ -285,11 +375,28 @@ export class Engine {
         if (!job) return;
         const alert = await this.store.get<Alert>('alert', job.alert_id, job.workspace),
           channel = await this.store.get<Channel>('channel', job.channel_id, job.workspace);
-        if (!alert || !channel?.enabled || alert.status === 'resolved') {
+        if (
+          job.workspace === 'demo' ||
+          !alert ||
+          !channel?.enabled ||
+          (job.event_type === 'recovery'
+            ? alert.status !== 'resolved'
+            : alert.status === 'resolved' || (job.event_type === 'repeat' && alert.acknowledged))
+        ) {
           await this.store.updateDelivery(job.id, { status: 'cancelled' });
           return;
         }
-        if (alert.snoozedUntil > now) {
+        const plan = await notificationPlan(this.store, alert, now, job.event_type === 'recovery');
+        if (!plan.channelIds.includes(job.channel_id)) {
+          await this.store.updateDelivery(job.id, {
+            status: 'cancelled',
+            error: plan.suppressedBy.length
+              ? 'Maintenance policy'
+              : 'Destination no longer matches routing policy',
+          });
+          return;
+        }
+        if (alert.snoozedUntil > now && job.event_type !== 'recovery') {
           await this.store.updateDelivery(job.id, { next_at: alert.snoozedUntil });
           return;
         }
@@ -297,6 +404,17 @@ export class Engine {
           const result = await this.send(decrypt(channel.encryptedUrl, this.key), {
             source: 'signaldesk',
             deliveryId: job.id,
+            event: job.event_type,
+            owner: plan.team,
+            investigation: {
+              page: 'logs',
+              workspace: alert.workspace,
+              service: alert.service,
+              environment: alert.environment,
+              ...Object.fromEntries(dimensionKeys.map((k) => [k, alert[k]])),
+              from: alert.createdAt - 300000,
+              to: (alert.resolvedAt ?? now) + 300000,
+            },
             alert,
           });
           if (result.status < 200 || result.status >= 300)
@@ -319,11 +437,21 @@ export class Engine {
   }
   async probes(now = Date.now()) {
     for (const candidate of (await this.store.list<Probe>('probe', 'live'))
-      .filter((p) => p.enabled && (!p.lastRun || now - p.lastRun >= 60000))
+      .filter(
+        (p) =>
+          p.enabled &&
+          (!p.vantageRegion || p.vantageRegion === this.workerResource.region) &&
+          (!p.lastRun || now - p.lastRun >= 60000),
+      )
       .slice(0, 10))
       await this.store.withWorker('probe:' + candidate.id, async () => {
         const probe = await this.store.get<Probe>('probe', candidate.id, 'live');
-        if (!probe?.enabled || (probe.lastRun && now - probe.lastRun < 60000)) return;
+        if (
+          !probe?.enabled ||
+          (probe.vantageRegion && probe.vantageRegion !== this.workerResource.region) ||
+          (probe.lastRun && now - probe.lastRun < 60000)
+        )
+          return;
         let up = 0;
         probe.lastDurationMs = null;
         try {
@@ -337,10 +465,21 @@ export class Engine {
           probe.lastError = error instanceof Error ? error.message : 'Probe failed';
         }
         probe.lastRun = now;
+        probe.lastVantageRegion = this.workerResource.region ?? 'unknown';
+        probe.lastWorkerId = this.workerId;
         // Preserve an operator disable that happened while the network check was running.
         await this.store.withControl(async () => {
           const current = await this.store.get<Probe>('probe', probe.id, 'live');
-          if (current) await this.store.put('probe', { ...probe, enabled: current.enabled });
+          if (current)
+            await this.store.put('probe', {
+              ...current,
+              lastRun: probe.lastRun,
+              lastStatus: probe.lastStatus,
+              lastDurationMs: probe.lastDurationMs,
+              lastError: probe.lastError,
+              lastVantageRegion: probe.lastVantageRegion,
+              lastWorkerId: probe.lastWorkerId,
+            });
         });
         const resource = Object.fromEntries(dimensionKeys.map((key) => [key, probe[key]]));
         await this.telemetry.append('live', [
@@ -378,6 +517,7 @@ export class Engine {
       });
       await this.probes(now);
       await this.evaluate('live', now);
+      await this.evaluateSLOs('live', now);
       await this.deliver(now);
       this.heartbeat = Date.now();
       this.lastError = null;

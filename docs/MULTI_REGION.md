@@ -78,3 +78,11 @@ Budget connections: `(API replicas + worker replicas) × PG_POOL_SIZE`, plus mig
 Automated local PostgreSQL and multi-process/Collector checks are in [verification](VERIFICATION.md). These gates are deployment prerequisites, not claims that geographically separated infrastructure has already been provisioned.
 
 Sources: [OTel service resource conventions](https://opentelemetry.io/docs/specs/semconv/resource/service/), [cloud resource conventions](https://opentelemetry.io/docs/specs/semconv/resource/cloud/), [PostgreSQL advisory locks](https://www.postgresql.org/docs/current/explicit-locking.html#ADVISORY-LOCKS), [Collector file storage at the pinned release](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/v0.162.0/extension/storage/filestorage/README.md).
+
+## v0.3 follow-through
+
+Native logs/metrics can use the Node fsync journal in [operations](OPERATIONS.md#durable-node-producer), while the existing real Collector outage test remains trace-only. Standard OTLP JSON log/metric subsets are accepted; complete protobuf/gRPC and point-label engine compatibility are not claimed. Journal single-writer/disk capacity must be budgeted independently per producer instance.
+
+The distributed Compose workers now identify Seoul and Virginia execution vantage. Probes can pin vantageRegion separately from the target resource's region and retain the actual executing worker/region. No matching worker means stale checks rather than implicit cross-region execution. This is tested resource-labelled local execution, not actual regional independence.
+
+Ingress quota trust is explicit: the example Nginx IP is 172.31.240.10 on a fixed 172.31.240.0/24 network. Adjust network/IP/trust together for conflicts. Health bypasses application quota. API replicas still use one PostgreSQL write authority; per-capacity serialization, no rollups and raw retained SQL require measured volume limits. SLOs share definitions with UI but count observed spans; sampling coverage must be checked against real request counters before operational SLO claims.

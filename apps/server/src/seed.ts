@@ -7,7 +7,11 @@ import type {
   Incident,
 } from '../../../packages/contracts/src/index.ts';
 export async function seedDemo(store: Storage, now = Date.now()) {
-  if (await store.setting('demoNow')) return;
+  const existingNow = await store.setting('demoNow');
+  if (existingNow) {
+    await seedOperationalDemo(store, Number(existingNow));
+    return;
+  }
   const services = [
     'api-gateway',
     'checkout-api',
@@ -100,11 +104,19 @@ export async function seedDemo(store: Storage, now = Date.now()) {
         service === 'ai-assistant' ? 'chat completion' : 'HTTP POST /v1/' + service.split('-')[0],
       durationMs: service === 'ai-assistant' ? 1500 + i * 5 : dur,
       status: error ? 'error' : 'ok',
-      attributes: { 'http.status_code': error ? 503 : 200 },
+      attributes: {
+        'http.response.status_code': error ? 503 : 200,
+        'http.route': '/v1/' + service.split('-')[0],
+        'http.request.method': 'POST',
+        'span.kind': 'server',
+      },
       ...(service === 'ai-assistant'
         ? {
             ai: {
               provider: 'example-provider',
+              modelVersion: 'demo-model-v1',
+              promptVersion: 'support-v3',
+              stage: 'generation' as const,
               model: Math.floor(i / 6) % 2 ? 'reasoning-large' : 'fast-small',
               inputTokens: 820 + i * 2,
               outputTokens: 240 + i,
@@ -138,7 +150,15 @@ export async function seedDemo(store: Storage, now = Date.now()) {
           name: ['auth.validate', 'db.query orders', 'payment.authorize'][k],
           durationMs: k === 1 && error ? 640 : 18 + k * 13,
           status: k === 1 && error ? 'error' : 'ok',
-          attributes: { 'db.system': k === 1 ? 'postgresql' : '' },
+          attributes:
+            k === 1
+              ? { 'db.system.name': 'postgresql' }
+              : k === 2
+                ? {
+                    'peer.service': 'payment-worker',
+                    'messaging.destination.name': 'payments.authorize',
+                  }
+                : { 'peer.service': 'auth-service' },
         });
   }
   const regions = ['ap-northeast-2', 'us-east-1', 'eu-west-1'];
@@ -274,5 +294,121 @@ export async function seedDemo(store: Storage, now = Date.now()) {
   };
   await store.put('incident', incident);
   await store.setSetting('demoNow', String(now));
-  await store.setSetting('demoRevision', '2');
+  await store.setSetting('demoRevision', '3');
+  await seedOperationalDemo(store, now);
+}
+
+async function seedOperationalDemo(store: Storage, now: number) {
+  if (!(await store.get('channel', 'demo-channel-preview', 'demo')))
+    await store.put('channel', {
+      id: 'demo-channel-preview',
+      workspace: 'demo',
+      name: '예제 목적지 · 실제 전송 없음',
+      enabled: true,
+      encryptedUrl: '',
+      createdAt: now,
+    });
+  if (!(await store.get('notification-route', 'demo-route-commerce', 'demo')))
+    await store.put('notification-route', {
+      id: 'demo-route-commerce',
+      workspace: 'demo',
+      name: 'Commerce 담당 팀 전달',
+      teamId: 'demo-team-commerce',
+      channelIds: ['demo-channel-preview'],
+      enabled: true,
+      repeatMinutes: 30,
+      notifyRecovery: true,
+      revision: 1,
+      createdAt: now,
+      updatedAt: now,
+    });
+  if (await store.get('team', 'demo-team-platform', 'demo')) return;
+  const base = { workspace: 'demo' as const, createdAt: now, updatedAt: now, revision: 1 };
+  for (const [id, name, contact] of [
+    ['platform', 'Platform', '플랫폼 운영팀'],
+    ['commerce', 'Commerce', '커머스 운영팀'],
+    ['ai', 'AI Services', 'AI 서비스팀'],
+  ])
+    await store.put('team', { ...base, id: 'demo-team-' + id, name, contact });
+  for (const name of [
+    'api-gateway',
+    'checkout-api',
+    'payment-worker',
+    'catalog-api',
+    'auth-service',
+    'ai-assistant',
+  ])
+    await store.put('catalog-service', {
+      ...base,
+      id: 'demo-catalog-' + name,
+      name,
+      aliases: [],
+      teamId:
+        'demo-team-' +
+        (name === 'ai-assistant'
+          ? 'ai'
+          : name === 'api-gateway' || name === 'auth-service'
+            ? 'platform'
+            : 'commerce'),
+      runbook: '',
+      repository: '',
+      description: '예제 서비스',
+      criticality: name === 'checkout-api' ? 'critical' : 'standard',
+      regions: ['ap-northeast-2', 'us-east-1', 'eu-west-1'],
+    });
+  for (const [id, name, service, indicator, objective, latencyMs] of [
+    ['checkout-success', 'Checkout 요청 성공률', 'checkout-api', 'availability', 99.9, 1000],
+    ['checkout-latency', 'Checkout 응답 시간', 'checkout-api', 'latency', 99, 500],
+    ['catalog-success', 'Catalog 요청 성공률', 'catalog-api', 'availability', 99, 1000],
+  ] as const)
+    await store.put('slo', {
+      ...base,
+      id: 'demo-slo-' + id,
+      name,
+      service,
+      environment: 'production',
+      indicator,
+      objective,
+      latencyMs,
+      windowMinutes: 60,
+      minimumRequests: 10,
+      alertBurnRate: 2,
+      enabled: true,
+    });
+  const dataset: import('../../../packages/contracts/src/index.ts').EvaluationDataset = {
+    ...base,
+    id: 'demo-eval-dataset',
+    name: '예제 구조화 응답 품질',
+    version: 'fixture-v1',
+    cases: [
+      {
+        id: 'answer',
+        expected: { grounded: true, valid: true },
+        actual: { grounded: true, valid: true },
+      },
+      { id: 'tool', expected: { success: true }, actual: { success: true } },
+    ],
+  };
+  await store.put('evaluation-dataset', dataset);
+  const { runEvaluation } = await import('./operations.ts');
+  const baseline = runEvaluation(
+    dataset,
+    { datasetId: dataset.id, modelVersion: 'demo-v1', promptVersion: 'demo-p1' },
+    null,
+  );
+  baseline.id = 'demo-eval-baseline';
+  await store.put('evaluation-run', baseline);
+  const candidate = runEvaluation(
+    dataset,
+    {
+      datasetId: dataset.id,
+      modelVersion: 'demo-v2',
+      promptVersion: 'demo-p2',
+      baselineId: baseline.id,
+      actuals: { answer: { grounded: false, valid: true }, tool: { success: true } },
+    },
+    baseline,
+  );
+  candidate.id = 'demo-eval-candidate';
+  await store.put('evaluation-run', candidate);
 }

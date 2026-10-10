@@ -85,7 +85,7 @@ export async function dashboard(
         : (r.errorPct ?? 0) > 1 || fresh('probe_up') === 0
           ? 'degraded'
           : 'healthy';
-    if (r.host) {
+    if (r.host && observed.some((m) => ['cpu_pct', 'memory_pct'].includes(m.name))) {
       hostMap.set(key, {
         ...identity(r),
         id: r.id,
@@ -97,10 +97,9 @@ export async function dashboard(
     }
     if (
       r.retired ||
-      (!!r.host &&
-        !observed.some((m) =>
-          ['request_rate', 'error_pct', 'latency_p95_ms', 'probe_up'].includes(m.name),
-        ))
+      (!r.observedApplication &&
+        observed.length > 0 &&
+        observed.every((m) => ['cpu_pct', 'memory_pct'].includes(m.name)))
     )
       continue;
     const serviceKey = r.service + '\0' + r.environment,
@@ -161,9 +160,9 @@ export async function dashboard(
     buckets.set(t, b);
   }
   const series: Dashboard['series'] = {
-    request_rate: { name: '요청량', unit: 'req/s', points: [] },
-    error_pct: { name: '요청 가중 오류율', unit: '%', points: [] },
-    latency_p95_ms: { name: '최대 인스턴스 p95', unit: 'ms', points: [] },
+    request_rate: { name: '요청량', unit: 'req/s', points: [], stepMs: step },
+    error_pct: { name: '요청 가중 오류율', unit: '%', points: [], stepMs: step },
+    latency_p95_ms: { name: '최대 인스턴스 p95', unit: 'ms', points: [], stepMs: step },
   };
   for (const [time, rows] of [...buckets].sort((a, b) => a[0] - b[0])) {
     const latest = new Map<string, Metric>();
@@ -199,6 +198,34 @@ export async function dashboard(
       ]);
     if (latencies.length)
       series.latency_p95_ms.points.push([time, Math.max(...latencies.map((m) => m.value))]);
+  }
+  if (telemetry.aggregate) {
+    const complete = await telemetry.aggregate('metricSeries', scope);
+    for (const key of Object.keys(series))
+      if (
+        ['request_rate', 'error_pct', 'latency_p95_ms'].includes(key) ||
+        key.startsWith('request_rate:region:')
+      )
+        delete series[key];
+    for (const [key, name, unit] of [
+      ['request_rate', '요청량', 'req/s'],
+      ['error_pct', '요청 가중 오류율', '%'],
+      ['latency_p95_ms', '최대 인스턴스 p95', 'ms'],
+    ])
+      series[key] = { name, unit, stepMs: complete.stepMs, points: [] };
+    for (const row of complete.rows) {
+      if (Number(row.global_group) === 1)
+        for (const key of ['request_rate', 'error_pct', 'latency_p95_ms']) {
+          if (row[key] !== null) series[key].points.push([Number(row.bucket), Number(row[key])]);
+        }
+      else if (row.request_rate !== null) {
+        const region = String(row.region),
+          key = 'request_rate:region:' + region;
+        series[key] ??= { name: region, unit: 'req/s', stepMs: complete.stepMs, points: [] };
+        series[key].points.push([Number(row.bucket), Number(row.request_rate)]);
+      }
+    }
+    if (complete.truncated) metricPage.truncated = true;
   }
   const hostBuckets = new Set<string>();
   for (const m of metrics.filter((m) => m.host && ['cpu_pct', 'memory_pct'].includes(m.name))) {
@@ -247,6 +274,7 @@ export async function dashboard(
         !(key in x) ||
         x[key as keyof typeof x] === scope[key as keyof QueryScope],
     );
+  for (const item of Object.values(series)) item.window = { from: scope.from, to: scope.to };
   return {
     resources: [...resources.values()],
     inventoryTruncated: !!inventoryPage?.truncated,

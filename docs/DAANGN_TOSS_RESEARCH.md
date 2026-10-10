@@ -1,5 +1,7 @@
 # 당근·토스의 모니터링 운영과 SignalDesk 적용 검토
 
+> v0.3 follow-through (2026-10-10): R1–R7 are repaired and the service/notification/SLI/AI redesign is implemented within documented bounds. The report below preserves its original research-time findings. Current state: [redesign](REDESIGN.md), [verification](VERIFICATION.md), [roadmap](ROADMAP.md).
+
 조사일: 2026-10-10. 대상: 서버/API, 로그, 장애 분석, 알림, 여러 인스턴스·모듈·리전, 운영 UI/UX, AI 서비스 관측.
 
 **SignalDesk의 다음 고도화는 서비스 소유권, 공통 운영 기준, 알림에서 시작하는 조사 흐름, 관측 데이터의 신뢰성에 집중해야 한다.** 공개 사례에서 얻은 설계 판단이다. 현재 기능이 당근·토스의 운영 수준에 도달했다는 의미가 아니다. 기존 [정확성 문제 R1–R7](OSS_COMPARISON_REVIEW.md)은 그대로 열려 있다.

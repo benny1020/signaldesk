@@ -1,3 +1,4 @@
+import { diagnosisGateway } from './diagnosis.ts';
 import { cpus, freemem, totalmem, hostname } from 'node:os';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -100,6 +101,15 @@ const config: Config = {
   key: Buffer.from(keyHex, 'hex'),
   allowedHosts: (process.env.ALLOWED_DESTINATION_HOSTS ?? '').split(',').filter(Boolean),
   logger: true,
+  diagnosisProvider:
+    process.env.AI_DIAGNOSIS_ENABLED === 'true' && process.env.AI_DIAGNOSIS_URL
+      ? diagnosisGateway(
+          process.env.AI_DIAGNOSIS_URL,
+          process.env.AI_DIAGNOSIS_TOKEN ?? '',
+          (process.env.ALLOWED_DESTINATION_HOSTS ?? '').split(',').filter(Boolean),
+        )
+      : undefined,
+  trustedProxies: (process.env.TRUSTED_PROXIES ?? '').split(',').filter(Boolean),
 };
 const { app, engine, counts } = await createApp(store, config);
 await app.listen({ host, port });

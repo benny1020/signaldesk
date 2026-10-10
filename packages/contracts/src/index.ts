@@ -28,10 +28,55 @@ export const metricSchema = z
   .object({
     ...base,
     kind: z.literal('metric'),
-    name: z.enum(metricNames),
-    value: z.number().finite().nonnegative(),
+    name: z
+      .string()
+      .min(1)
+      .max(100)
+      .regex(/^[a-zA-Z_:][a-zA-Z0-9_.:]*$/),
+    value: z.number().finite(),
+    metricType: z.enum(['gauge', 'counter', 'histogram']).optional(),
+    unit: z.string().max(100).optional(),
+    startTimestamp: z.number().int().nonnegative().optional(),
+    temporality: z.enum(['delta', 'cumulative']).optional(),
+    histogram: z
+      .object({
+        count: z.number().int().nonnegative(),
+        sum: z.number().finite(),
+        bounds: z.array(z.number().finite()).max(200),
+        bucketCounts: z.array(z.number().int().nonnegative()).max(201),
+      })
+      .optional(),
   })
   .superRefine((m, ctx) => {
+    if ((metricNames as readonly string[]).includes(m.name) && m.value < 0)
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Operational metrics must be nonnegative',
+        path: ['value'],
+      });
+    if (m.metricType === 'counter' && m.value < 0)
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Monotonic counters must be nonnegative',
+        path: ['value'],
+      });
+    if (m.metricType === 'histogram' && !m.histogram)
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Histogram distribution required',
+        path: ['histogram'],
+      });
+    if (
+      m.histogram &&
+      (m.histogram.bucketCounts.length !== m.histogram.bounds.length + 1 ||
+        m.histogram.bucketCounts.reduce((n, v) => n + v, 0) !== m.histogram.count ||
+        m.histogram.bounds.some((b, i) => i > 0 && b <= m.histogram!.bounds[i - 1]))
+    )
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Invalid histogram distribution',
+        path: ['histogram'],
+      });
     if (['cpu_pct', 'memory_pct', 'error_pct'].includes(m.name) && m.value > 100)
       ctx.addIssue({
         code: 'custom',
@@ -62,6 +107,11 @@ export const spanSchema = z.object({
   ai: z
     .object({
       provider: z.string().max(100),
+      modelVersion: z.string().max(100).optional(),
+      promptVersion: z.string().max(100).optional(),
+      sessionId: z.string().max(128).optional(),
+      stage: z.enum(['generation', 'tool', 'retrieval', 'evaluation']).optional(),
+      failureType: z.string().max(100).optional(),
       model: z.string().max(100),
       inputTokens: z.number().int().nonnegative(),
       outputTokens: z.number().int().nonnegative(),
@@ -95,7 +145,11 @@ export const ruleSchema = z.object({
   name: z.string().min(1).max(160),
   service: z.string().min(1).max(100),
   environment: z.string().min(1).max(50).default('production'),
-  metric: z.enum(metricNames),
+  metric: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-zA-Z_:][a-zA-Z0-9_.:]*$/),
   operator: z.enum(['gt', 'lt']),
   threshold: z.number().finite(),
   durationSec: z.number().int().min(0).max(86400).default(0),
@@ -128,6 +182,11 @@ export type Alert = ResourceSelector & {
   resolvedAt: number | null;
   acknowledged: boolean;
   snoozedUntil: number;
+  acknowledgedBy?: string;
+  snoozedBy?: string;
+  snoozeReason?: string;
+  lastNotifiedAt?: number;
+  notificationSequence?: number;
 };
 export type Incident = ResourceSelector & {
   id: string;
@@ -139,6 +198,7 @@ export type Incident = ResourceSelector & {
   status: 'investigating' | 'identified' | 'monitoring' | 'resolved';
   owner: string;
   alertId?: string;
+  alertIds?: string[];
   createdAt: number;
   updatedAt: number;
   timeline: { id: string; time: number; text: string; actor: string }[];
@@ -155,9 +215,17 @@ export type QueryScope = ResourceSelector & {
   level?: string;
   traceId?: string;
   metric?: Metric['name'];
+  route?: string;
+  eventId?: string;
 };
 export type Page<T> = { items: T[]; nextCursor: string | null; truncated: boolean };
-export type Series = { name: string; unit: string; points: [number, number][] };
+export type Series = {
+  window?: { from: number; to: number };
+  name: string;
+  unit: string;
+  points: [number, number][];
+  stepMs?: number;
+};
 export type ServiceSummary = {
   name: string;
   environment: string;
@@ -179,6 +247,7 @@ export type HostSummary = ResourceIdentity & {
 };
 export type ResourceSummary = ResourceIdentity & {
   id: string;
+  observedApplication?: boolean;
   host?: string;
   firstSeen: number;
   lastSeen: number;
@@ -229,3 +298,5 @@ export type Dashboard = {
     }[];
   };
 };
+
+export * from './operations.ts';

@@ -19,13 +19,13 @@ Overview, Deployments & instances, Services & APIs, Infrastructure, Logs, Traces
 
 Implemented baseline: native JSON telemetry API, local host/API collector, SQLite/PostgreSQL persistence, full deployment-scoped queries, resource/region/service group duration/no-data evaluator, persisted notification outbox, HTTPS webhook delivery with bounded retries, HTTPS synthetic checks, incident timeline, role tokens, bounded queries, retention, evidence summaries, AI span ingestion with content stripping.
 
-Later: columnar/time-series adapters, managed DB/geographic failover certification, automatic deployment discovery, full OTLP protobuf/gRPC interoperability, on-call rotations, bidirectional external incident systems, autonomous remediation, model-driven diagnosis, evaluation runners. These must not be shown as connected or successful in the UI.
+Later: columnar/time-series adapters, managed DB/geographic failover certification, automatic deployment discovery, full OTLP protobuf/gRPC interoperability, on-call rotations, bidirectional external incident systems, autonomous remediation, production-certified model diagnosis and semantic evaluation runners. Configured evidence-gateway diagnosis and deterministic structured evaluation are delivered in v0.3. These must not be shown as connected or successful in the UI.
 
 ## Design tokens and review
 
 Color: Ink #12283f, Canvas #f3f6fa, Surface #ffffff, Ocean #2869d8, Teal #087f8c, Fault #c84646, Warning #a96a12. Color encodes state; icons and words repeat the meaning.
 
-Type: bundled Manrope for product text, system Korean sans fallback, system monospace only for trace IDs/log content. 13px table/body, 22px page heading, 30px key measurement. Layout: 216px navigation, shared context bar, charts paired with actionable service rows, right-side evidence drawer. Compact tables keep comparisons aligned. Charts are not decorative card backgrounds.
+Type: bundled Manrope for product text, system Korean sans fallback, system monospace only for trace IDs/log content. 14px table/body, 22px page heading, 30px key measurement. Layout: 216px navigation, shared context bar, charts paired with actionable service rows, right-side evidence drawer. Compact tables keep comparisons aligned. Charts are not decorative card backgrounds.
 
 ```
 navigation | workspace / environment / service / time / pause
@@ -39,4 +39,12 @@ Review against brief: use a light reading canvas and muted navy navigation for l
 
 ## Multi-deployment visual semantics
 
-The shared deployment bar exposes region, module, cluster, namespace, zone and instance. Regional rows align request rate, weighted errors, worst-instance p95 and stale-resource counts; the inventory identifies equal Pod names by full tuple. Resource drilldown preserves all dimensions. Exact trace opens the whole request across regions, while logs remain scoped. Missing identities are labelled unknown. Worker health shows each platform process separately from application instances.
+The shared deployment bar keeps region visible and collapses module/cluster/namespace/zone/instance until needed. Facets respect other active selectors. Regional rows align request rate, weighted errors, worst-instance p95 and stale-resource counts; the inventory identifies equal Pod names by full tuple. Resource drilldown preserves all dimensions. Exact trace opens the whole request across regions, while logs remain scoped. Missing identities are labelled unknown. Worker health shows each platform process separately from application instances.
+
+## v0.3 investigation contracts
+
+Operators can identify a service owner/runbook, compare API failure groups, open correlated log/trace evidence, switch to the exact child resource, manage delivery policy and minimum-coverage SLOs, and evaluate candidate AI versions. Absolute UTC bounds and KST/UTC display are separate; detail URLs freeze their time window. Saved views persist locally and do not include the token. Sidebar scrolls to the active menu; long tables scroll inside their panels on narrow screens.
+
+AI version summaries and candidate evaluation are primary. Individual token/call evidence is revealed on demand rather than duplicating an uncapped-looking summary. External analysis is a configured explicit opt-in operation; local facts, supporting/counter/missing evidence and next checks remain the default. Relationships show observed edges and equivalent tables; an absent edge is unknown, not proof of no dependency.
+
+[Redesign](REDESIGN.md) and [verification](VERIFICATION.md) track implemented acceptance. Browser checks establish task behavior under Demo fixtures; real operators and measured completion time/error rates remain a product gate.

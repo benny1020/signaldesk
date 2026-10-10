@@ -184,7 +184,28 @@ export function Detail({
               </p>
               <TraceWaterfall
                 spans={trace.data.items}
-                onService={(name) => p.select({ type: 'service', name })}
+                onService={(s) =>
+                  p.focusResource(
+                    {
+                      ...s,
+                      id: s.id ?? s.spanId,
+                      firstSeen: s.timestamp,
+                      lastSeen: s.timestamp,
+                      retired: false,
+                      requestRate: null,
+                      errorPct: null,
+                      latency: null,
+                      status: 'unknown',
+                      module: s.module ?? 'unknown',
+                      region: s.region ?? 'unknown',
+                      zone: s.zone ?? 'unknown',
+                      cluster: s.cluster ?? 'unknown',
+                      namespace: s.namespace ?? 'unknown',
+                      instanceId: s.instanceId ?? 'unknown',
+                    },
+                    'services',
+                  )
+                }
               />
               {trace.data.items
                 .filter((s) => s.ai)
@@ -340,6 +361,35 @@ export function Detail({
               </div>
             </label>
           </div>
+          <Panel title="연결된 알림" meta="같은 장애에 여러 감지 근거 연결">
+            {p.data.alerts
+              .filter(
+                (a) =>
+                  a.service === incident.service ||
+                  (incident.alertIds ?? []).includes(a.id) ||
+                  incident.alertId === a.id,
+              )
+              .map((a) => {
+                const ids = incident.alertIds ?? (incident.alertId ? [incident.alertId] : []);
+                return (
+                  <label className="checkbox" key={a.id}>
+                    <input
+                      type="checkbox"
+                      disabled={busy}
+                      checked={ids.includes(a.id)}
+                      onChange={(e) =>
+                        void changeIncident({
+                          alertIds: e.target.checked
+                            ? [...ids, a.id]
+                            : ids.filter((id) => id !== a.id),
+                        })
+                      }
+                    />
+                    {a.title} · {a.region ?? '전체 리전'} · {a.status}
+                  </label>
+                );
+              })}
+          </Panel>
           <div className="timeline">
             {incident.timeline.map((t) => (
               <div key={t.id}>

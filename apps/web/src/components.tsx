@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode, lazy, Suspense } from 'react';
+import { useEffect, useRef, useId, type ReactNode, lazy, Suspense } from 'react';
 import { X, ChevronRight, CheckCircle2, TriangleAlert, Clock, Inbox } from 'lucide-react';
 import type {
   Dashboard,
@@ -42,8 +42,11 @@ export const number = (v: number | null | undefined, decimals = 1) =>
   v === null || v === undefined
     ? '—'
     : v.toLocaleString('ko-KR', { maximumFractionDigits: decimals });
+export const displayTimeZone = () =>
+  new URLSearchParams(location.search).get('timezone') === 'UTC' ? 'UTC' : 'Asia/Seoul';
 export const time = (t: number) =>
   new Date(t).toLocaleTimeString('ko-KR', {
+    timeZone: displayTimeZone(),
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
@@ -101,6 +104,7 @@ export function Dialog({
   onClose: () => void;
   drawer?: boolean;
 }) {
+  const titleId = useId();
   const ref = useRef<HTMLDialogElement>(null),
     callback = useRef(onClose);
   callback.current = onClose;
@@ -117,13 +121,14 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
+      aria-labelledby={titleId}
       className={drawer ? 'drawer' : 'modal'}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <header>
-        <h2>{title}</h2>
+        <h2 id={titleId}>{title}</h2>
         <button aria-label="닫기" className="icon-button" onClick={onClose}>
           <X size={20} />
         </button>
@@ -241,7 +246,7 @@ export function TraceWaterfall({
   onService,
 }: {
   spans: Span[];
-  onService?: (name: string) => void;
+  onService?: (span: Span) => void;
 }) {
   if (!spans.length) return <Empty>이 범위에서 트레이스가 발견되지 않았습니다.</Empty>;
   const ordered = [...spans].sort((a, b) => a.timestamp - b.timestamp),
@@ -275,8 +280,8 @@ export function TraceWaterfall({
         <div className="waterfall-row" key={s.spanId}>
           <div className="span-name" style={{ paddingLeft: depth(s) * 14 }}>
             <strong>{s.name}</strong>
-            <button className="text-button" onClick={() => onService?.(s.service)}>
-              {s.service}
+            <button className="text-button" onClick={() => onService?.(s)}>
+              {s.service} / {s.region ?? '미지정'}
             </button>
           </div>
           <div className="waterfall-track">

@@ -9,6 +9,7 @@ import {
   AriaComponent,
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
+import { displayTimeZone } from './components';
 import type { Series } from '../../../packages/contracts/src/index';
 echarts.use([
   LineChart,
@@ -39,6 +40,7 @@ export default function Chart({
     instance = useRef<ReturnType<typeof echarts.init> | null>(null),
     [table, setTable] = useState(false),
     [hidden, setHidden] = useState<string[]>([]);
+  const timeZone = displayTimeZone();
   const visible = series.filter((s) => !hidden.includes(s.name));
   const hasData = series.some((s) => s.points.length > 0);
   useEffect(() => {
@@ -76,7 +78,11 @@ export default function Chart({
           xAxis: {
             type: 'category',
             data: points.map((p) =>
-              new Date(p[0]).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+              new Date(p[0]).toLocaleTimeString('ko-KR', {
+                hour: '2-digit',
+                minute: '2-digit',
+                timeZone,
+              }),
             ),
             axisLabel: { color: '#63758a', interval: Math.max(0, Math.floor(points.length / 8)) },
           },
@@ -117,13 +123,19 @@ export default function Chart({
           },
           xAxis: {
             type: 'time',
+            min: visible[0]?.window?.from,
+            max: visible[0]?.window?.to,
             splitNumber: 5,
             axisLabel: {
               hideOverlap: true,
               color: '#748397',
-              fontSize: 10,
+              fontSize: 11,
               formatter: (v: number) =>
-                new Date(v).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }),
+                new Date(v).toLocaleTimeString('ko-KR', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  timeZone,
+                }),
             },
             axisLine: { lineStyle: { color: '#e0e7f0' } },
             axisTick: { show: false },
@@ -131,7 +143,7 @@ export default function Chart({
           yAxis: {
             type: 'value',
             min: 0,
-            axisLabel: { color: '#748397', fontSize: 10 },
+            axisLabel: { color: '#53677d', fontSize: 11 },
             splitLine: { lineStyle: { color: '#edf1f6' } },
             name: visible[0]?.unit,
             nameTextStyle: { color: '#748397', fontSize: 10 },
@@ -141,7 +153,11 @@ export default function Chart({
           series: visible.map((s) => ({
             name: s.name,
             type: 'line',
-            data: s.points,
+            data: s.points.flatMap((p, i) =>
+              i > 0 && s.stepMs && p[0] - s.points[i - 1][0] > s.stepMs * 1.5
+                ? [[s.points[i - 1][0] + s.stepMs, null], p]
+                : [p],
+            ),
             showSymbol: false,
             smooth: false,
             sampling: 'lttb',
@@ -174,20 +190,65 @@ export default function Chart({
       const opt = chart.getOption() as { dataZoom?: { start: number; end: number }[] };
       const zoom = opt.dataZoom?.[0];
       if (zoom) {
-        const first = points[0][0],
-          last = points.at(-1)![0];
+        const first = visible[0]?.window?.from ?? points[0][0],
+          last = visible[0]?.window?.to ?? points.at(-1)![0];
         onRange(
           Math.round(first + ((last - first) * zoom.start) / 100),
           Math.round(first + ((last - first) * zoom.end) / 100),
         );
       }
     });
-  }, [visible, title, heatmap, onRange, table]);
+  }, [visible, title, heatmap, onRange, table, timeZone]);
   return (
     <div className="chart">
       <div className="chart-header">
         <h3>{title}</h3>
         <div className="chart-tools">
+          <button
+            className="text-button"
+            disabled={!hasData}
+            onClick={() => {
+              const cell = (value: unknown) =>
+                '"' +
+                String(value)
+                  .replace(/^[=+@-]/, "'")
+                  .replaceAll('"', '""') +
+                '"';
+              const rows = [
+                ['timestamp_utc', 'series', 'value', 'unit'],
+                ...visible.flatMap((s) =>
+                  s.points.map(([t, v]) => [new Date(t).toISOString(), s.name, v, s.unit]),
+                ),
+              ];
+              const blob = new Blob(
+                ['\ufeff' + rows.map((r) => r.map(cell).join(',')).join('\r\n')],
+                { type: 'text/csv;charset=utf-8' },
+              );
+              const url = URL.createObjectURL(blob),
+                a = document.createElement('a');
+              a.href = url;
+              a.download = 'signaldesk-chart.csv';
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
+            CSV
+          </button>
+
+          {onRange && series[0]?.points.length > 1 && (
+            <button
+              className="text-button"
+              onClick={() => {
+                const points = series[0].points,
+                  from = points[0][0],
+                  to = points.at(-1)![0],
+                  margin = (to - from) / 4;
+                onRange(Math.round(from + margin), Math.round(to - margin));
+              }}
+            >
+              가운데 구간 조사
+            </button>
+          )}
           {!heatmap && <span>Ctrl + 스크롤로 확대</span>}
           <button className="text-button" onClick={() => setTable(!table)}>
             {table ? '그래프 보기' : '데이터 보기'}

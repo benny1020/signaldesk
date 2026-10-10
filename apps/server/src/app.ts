@@ -1,3 +1,6 @@
+import { diagnosis, type DiagnosisProvider } from './diagnosis.ts';
+import { otlpLogs, otlpMetrics } from './otlp.ts';
+import { registerOperations } from './operations.ts';
 import Fastify, { type FastifyRequest } from 'fastify';
 import rateLimit from '@fastify/rate-limit';
 import compress from '@fastify/compress';
@@ -44,6 +47,8 @@ export type Config = {
   deploymentEnvironment?: string;
   role?: string;
   requireResourceIdentity?: boolean;
+  trustedProxies?: string[];
+  diagnosisProvider?: DiagnosisProvider;
 };
 const scopeSchema = z.object({
   ...dimensionSchema,
@@ -56,6 +61,7 @@ const scopeSchema = z.object({
   limit: z.coerce.number().int().min(1).max(10000).optional(),
   cursor: z.string().max(1000).optional(),
   search: z.string().max(500).optional(),
+  route: z.string().max(200).optional(),
   level: z.enum(['debug', 'info', 'warn', 'error']).optional(),
 });
 const incidentInput = z.object({
@@ -66,12 +72,14 @@ const incidentInput = z.object({
   severity: z.enum(['critical', 'warning']).default('warning'),
   owner: z.string().max(100).default(''),
   alertId: z.string().max(128).optional(),
+  alertIds: z.array(z.string().max(128)).max(100).default([]),
 });
 const httpError = (message: string, statusCode = 400) =>
   Object.assign(new Error(message), { statusCode });
 export async function createApp(store: Storage, config: Config, telemetry: TelemetryStore = store) {
   const app = Fastify({
     logger: config.logger ?? false,
+    trustProxy: config.trustedProxies ?? false,
     bodyLimit: 1024 * 1024,
     requestTimeout: 10000,
   });
@@ -80,7 +88,11 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
     globalDecompression: true,
     requestEncodings: ['gzip'],
   });
-  await app.register(rateLimit, { max: 240, timeWindow: '1 minute' });
+  await app.register(rateLimit, {
+    max: 240,
+    timeWindow: '1 minute',
+    allowList: (req) => req.url.split('?')[0] === '/health',
+  });
   const engine = new Engine(
     store,
     config.key,
@@ -92,7 +104,15 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
     if (
       !route.url.startsWith('/api/') ||
       !['POST', 'PATCH'].includes(String(route.method)) ||
-      ['/api/ingest', '/api/v1/traces', '/api/rules/preview'].includes(route.url)
+      [
+        '/api/ingest',
+        '/api/v1/traces',
+        '/api/v1/logs',
+        '/api/v1/metrics',
+        '/api/rules/preview',
+        '/api/diagnosis',
+        '/api/notification-routes/preview',
+      ].includes(route.url)
     )
       return;
     const handler = route.handler;
@@ -221,7 +241,7 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
   const actor = (req: FastifyRequest, w: Workspace) => access(req, w, 'write');
   app.get('/health', async () => {
     await store.setting('demoNow');
-    return { status: 'ok', version: '0.2.0', backend: store.backend, role: config.role ?? 'all' };
+    return { status: 'ok', version: '0.3.0', backend: store.backend, role: config.role ?? 'all' };
   });
   app.get('/api/bootstrap', async (req) => {
     const w = workspaceSchema.parse((req.query as { workspace?: string }).workspace ?? 'demo');
@@ -230,18 +250,23 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
       mode: config.mode,
       workspace: w,
       demoNow: Number((await store.setting('demoNow')) ?? Date.now()),
-      version: '0.2.0',
+      version: '0.3.0',
+      diagnosisDestination: config.diagnosisProvider?.name ?? null,
       capabilities: {
         nativeJson: true,
         resourceDimensions: dimensionKeys,
         requireResourceIdentity: config.requireResourceIdentity ?? false,
         sharedStorage: store.backend === 'postgres',
         otlpJsonTraces: true,
+        otlpJsonLogs: true,
+        otlpJsonMetrics: true,
+        serverAggregation: !!telemetry.aggregate,
         otlpProtobuf: false,
-        modelDiagnosis: false,
+        modelDiagnosis: !!config.diagnosisProvider,
       },
     };
   });
+  registerOperations(app, store, telemetry, scope, actor);
   app.get('/api/resources', async (req) => {
     const q = await scope(req);
     if (!telemetry.inventory) throw httpError('Storage does not implement resource inventory', 501);
@@ -262,6 +287,25 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
     return { id, retired };
   });
   app.get('/api/dashboard', async (req) => dashboard(store, await scope(req), telemetry));
+  app.post('/api/diagnosis', async (req) => {
+    const q = await scope(req, 'write');
+    const external = z.object({ external: z.boolean().default(false) }).parse(req.body).external;
+    if (external && !config.diagnosisProvider)
+      throw httpError('No diagnosis gateway configured', 503);
+    const result = await diagnosis(
+      store,
+      telemetry,
+      q,
+      external ? config.diagnosisProvider : undefined,
+    );
+    await store.audit(
+      q.workspace,
+      actor(req, q.workspace),
+      external ? 'diagnosis.external' : 'diagnosis.local',
+      result.promptVersion,
+    );
+    return result;
+  });
   app.get('/api/briefing', async (req) => briefing(store, await scope(req), telemetry));
   app.get('/api/logs', async (req) => telemetry.query('log', await scope(req)));
   app.get('/api/spans', async (req) => telemetry.query('span', await scope(req)));
@@ -303,6 +347,37 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
     counts.accepted += accepted;
     return { accepted, duplicates: data.events.length - accepted };
   });
+  for (const [path, convert] of [
+    ['logs', otlpLogs],
+    ['metrics', otlpMetrics],
+  ] as const)
+    app.post('/api/v1/' + path, async (req) => {
+      const workspace = workspaceSchema.parse(
+        (req.query as { workspace?: string }).workspace ?? 'live',
+      );
+      access(req, workspace, 'ingest');
+      const events = convert(req.body),
+        now = Date.now();
+      checkResourceIdentity(events);
+      if (events.some((e) => e.timestamp > now + 60000 || e.timestamp < now - 7 * 86400000))
+        throw httpError('Events outside retention');
+      const accepted = events.length ? await telemetry.append(workspace, events.map(sanitize)) : 0;
+      counts.accepted += accepted;
+      return { partialSuccess: {} };
+    });
+  app.get('/api/events/log/:id', async (req) => {
+    const q = await scope(req);
+    const result = await telemetry.query('log', {
+      ...q,
+      eventId: z
+        .string()
+        .max(128)
+        .parse((req.params as { id: string }).id),
+      limit: 1,
+    });
+    if (!result.items.length) throw httpError('Log not found in investigation scope', 404);
+    return result.items[0];
+  });
   app.post('/api/v1/traces', async (req) => {
     const w = workspaceSchema.parse((req.query as { workspace?: string }).workspace ?? 'live');
     access(req, w, 'ingest');
@@ -330,6 +405,7 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
                         spanId: z.string(),
                         parentSpanId: z.string().optional(),
                         name: z.string(),
+                        kind: z.number().optional(),
                         startTimeUnixNano: z.string().regex(/^\d+$/),
                         endTimeUnixNano: z.string().regex(/^\d+$/),
                         attributes: z.array(attr).optional(),
@@ -380,7 +456,7 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
             host: resource['host.id'] ?? resource['host.name'],
             environment: String(resource['deployment.environment.name'] ?? 'production'),
             status: s.status?.code === 2 ? 'error' : 'ok',
-            attributes,
+            attributes: { ...attributes, ...(s.kind === 2 ? { 'span.kind': 'server' } : {}) },
             ...(get('gen_ai.request.model') &&
             get('gen_ai.usage.input_tokens') !== undefined &&
             get('gen_ai.usage.output_tokens') !== undefined
@@ -516,11 +592,18 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
         .object({
           acknowledged: z.boolean().optional(),
           snoozeMinutes: z.number().int().min(0).max(1440).optional(),
+          reason: z.string().max(1000).optional(),
         })
         .parse(req.body);
-    if (patch.acknowledged !== undefined) a.acknowledged = patch.acknowledged;
-    if (patch.snoozeMinutes !== undefined)
+    if (patch.acknowledged !== undefined) {
+      a.acknowledged = patch.acknowledged;
+      a.acknowledgedBy = actor(req, q.workspace);
+    }
+    if (patch.snoozeMinutes !== undefined) {
       a.snoozedUntil = Date.now() + patch.snoozeMinutes * 60000;
+      a.snoozedBy = actor(req, q.workspace);
+      a.snoozeReason = patch.reason ?? '';
+    }
     await store.put('alert', a);
     await store.audit(q.workspace, actor(req, q.workspace), 'alert.updated', a.id);
     return a;
@@ -528,7 +611,8 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
   app.post('/api/incidents', async (req) => {
     const q = await scope(req, 'write'),
       input = incidentInput.parse(req.body);
-    if (input.alertId) await getEntity<Alert>('alert', input.alertId, q.workspace);
+    for (const id of [...input.alertIds, ...(input.alertId ? [input.alertId] : [])])
+      await getEntity<Alert>('alert', id, q.workspace);
     if ((await store.incidents(q.workspace)).length >= 1000)
       throw httpError('Incident limit reached');
     const now = Date.now(),
@@ -559,10 +643,16 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
           status: z.enum(['investigating', 'identified', 'monitoring', 'resolved']).optional(),
           owner: z.string().max(100).optional(),
           note: z.string().min(1).max(2000).optional(),
+          alertIds: z.array(z.string().max(128)).max(100).optional(),
         })
         .parse(req.body);
     if (incident.timeline.length >= 500) throw httpError('Timeline limit reached');
     const texts: string[] = [];
+    if (patch.alertIds) {
+      for (const id of patch.alertIds) await getEntity<Alert>('alert', id, q.workspace);
+      incident.alertIds = [...new Set(patch.alertIds)];
+      texts.push('연결 알림 변경: ' + incident.alertIds.length);
+    }
     if (patch.status) {
       incident.status = patch.status;
       texts.push('상태 변경: ' + patch.status);
@@ -603,6 +693,7 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
       ),
       probes: await store.list<Probe>('probe', q.workspace),
       deliveries: await store.deliveries(q.workspace),
+      deliveryHealth: await store.deliveryStats(q.workspace),
       health: {
         ...counts,
         durations: undefined,
@@ -661,6 +752,7 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
           service: z.string().min(1).max(100),
           environment: z.string().min(1).max(50).default('production'),
           url: z.url().max(2000),
+          vantageRegion: z.string().min(1).max(100).optional(),
         })
         .parse(req.body);
     if (q.workspace === 'demo') throw httpError('Synthetic checks are available in Live only');

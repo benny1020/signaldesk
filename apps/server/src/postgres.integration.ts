@@ -201,6 +201,98 @@ test('real PostgreSQL storage, concurrency and loss-of-lock acceptance', async (
         assert.equal(await b.setting('new-worker-write'), 'ok');
       },
     );
+    await t.test(
+      'SQL operational aggregation and distinct recovery outbox agree across pools',
+      async () => {
+        const { evaluateSLO } = await import('./operations.ts');
+        await a.append(
+          'live',
+          Array.from({ length: 1100 }, (_, i) => ({
+            kind: 'span' as const,
+            id: 'ops-' + i,
+            traceId: 'ops-t' + i,
+            spanId: 'ops-s' + i,
+            timestamp: now - i * 1000,
+            service: 'ops-test',
+            environment: 'test',
+            region: 'seoul',
+            name: 'GET /orders/:id',
+            durationMs: 100,
+            status: i < 33 ? ('error' as const) : ('ok' as const),
+            attributes: { 'http.route': '/orders/:id', 'span.kind': 'server' },
+          })),
+        );
+        const q = {
+          workspace: 'live' as const,
+          service: 'ops-test',
+          environment: 'test',
+          from: now - 3600000,
+          to: now,
+        };
+        const apis = await b.aggregate('apis', q);
+        assert.equal(apis.rows[0].count, 1100);
+        assert.equal(apis.rows[0].errors, 33);
+        const result = await evaluateSLO(
+          b,
+          {
+            id: 'ops-slo',
+            workspace: 'live',
+            name: 'SLI',
+            service: 'ops-test',
+            environment: 'test',
+            objective: 99,
+            indicator: 'latency',
+            latencyMs: 50,
+            windowMinutes: 60,
+            minimumRequests: 10,
+            alertBurnRate: 2,
+            enabled: true,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          },
+          now,
+        );
+        assert.equal(result.bad, 1100);
+        assert.equal(result.status, 'violated');
+        const trace = await b.aggregate('traces', { ...q, route: '/orders/:id' });
+        assert.equal(trace.rows.length, 1000);
+        assert.equal(trace.truncated, true);
+        const metricScope = { ...q, service: 'postgres-test', from: now - 60000, to: now + 2000 };
+        const series = await b.aggregate('metricSeries', metricScope);
+        assert.ok(series.rows.length > 0);
+        const alert = {
+          id: 'ops-recovery',
+          workspace: 'live' as const,
+          ruleId: 'ops-r',
+          title: 'test',
+          service: 'ops-test',
+          environment: 'test',
+          severity: 'warning' as const,
+          status: 'resolved' as const,
+          reason: 'threshold' as const,
+          value: 0,
+          createdAt: now,
+          resolvedAt: now + 1,
+          acknowledged: false,
+          snoozedUntil: 0,
+        };
+        await a.publishAlert(alert, ['ops-channel']);
+        await b.publishAlert(alert, ['ops-channel'], {
+          key: alert.id + ':recovery',
+          type: 'recovery',
+          time: now + 1,
+        });
+        await b.publishAlert(alert, ['ops-channel'], {
+          key: alert.id + ':recovery',
+          type: 'recovery',
+          time: now + 1,
+        });
+        const receipts = (await a.deliveries('live')).filter((d) => d.alert_id === alert.id);
+        assert.equal(receipts.length, 2);
+        assert.deepEqual(receipts.map((d) => d.event_type).sort(), ['firing', 'recovery']);
+      },
+    );
   } finally {
     await a.close();
     await b.close();

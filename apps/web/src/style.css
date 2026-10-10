@@ -2476,3 +2476,262 @@ td small,
     margin-left: 0;
   }
 }
+/* v0.3: an investigation workspace with explicit context and comparison rows. */
+:root {
+  font-size: 14px;
+  --muted: #53677d;
+  --ink: #182c43;
+  --red: #c43b4d;
+}
+.sidebar {
+  background: #172b44;
+}
+.sidebar nav a {
+  font-size: 13px;
+  min-height: 39px;
+}
+.sidebar nav {
+  overflow: auto;
+}
+.sidebar-bottom {
+  position: relative;
+  margin-top: auto;
+}
+.context-bar {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.context-right {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.resource-context {
+  flex-wrap: wrap;
+}
+.resource-context select {
+  max-width: 200px;
+}
+.page-heading p,
+.muted,
+.cell-detail,
+.policy-row small {
+  color: #53677d;
+}
+.investigation-intro {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1px solid #d7e3f1;
+  border-left: 4px solid #2869d8;
+  background: #fff;
+  margin-bottom: 20px;
+  border-radius: 8px;
+}
+.investigation-intro > div {
+  flex: 1;
+}
+.investigation-intro strong {
+  font-size: 16px;
+}
+.investigation-intro p {
+  margin-top: 6px;
+  color: #53677d;
+  line-height: 1.65;
+  font-size: 13px;
+}
+.cell-detail {
+  display: block;
+  font-size: 12px;
+  margin-top: 5px;
+  line-height: 1.5;
+}
+.scope-chip-list,
+.saved-view-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 14px 18px;
+}
+.scope-chip {
+  padding: 7px 10px;
+  background: #edf3fc;
+  border: 1px solid #ccdbee;
+  border-radius: 5px;
+  font-size: 12px;
+}
+.policy-row {
+  display: grid;
+  gap: 7px;
+  border-bottom: 1px solid #e2e9f1;
+  padding: 16px 20px;
+}
+.relationship-map {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+}
+.relationship-edge {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 180px minmax(120px, 1fr) 90px;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+  padding: 14px 16px;
+  background: #f5f8fc;
+  border: 1px solid #d7e3f1;
+  border-radius: 6px;
+}
+.relationship-edge > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #53677d;
+  font-size: 12px;
+}
+.relationship-edge small {
+  display: block;
+  color: #53677d;
+  margin-top: 4px;
+}
+.form fieldset {
+  border: 1px solid #d7e3f1;
+  border-radius: 6px;
+  padding: 12px;
+}
+.form textarea {
+  min-height: 110px;
+  line-height: 1.6;
+}
+.chart-header h3 {
+  font-size: 13px;
+}
+.chart-tools {
+  font-size: 12px;
+}
+@media (max-width: 1000px) {
+  .investigation-intro {
+    flex-wrap: wrap;
+  }
+  .investigation-intro > div {
+    flex-basis: calc(100% - 40px);
+  }
+  .relationship-edge {
+    grid-template-columns: 1fr 1fr;
+  }
+  .sidebar nav a {
+    font-size: 12px;
+    min-height: 34px;
+  }
+}
+@media (max-width: 700px) {
+  .context-right {
+    justify-content: flex-start;
+  }
+  .context-bar {
+    align-items: flex-start;
+  }
+  .context-left {
+    flex-wrap: wrap;
+  }
+  .relationship-edge {
+    grid-template-columns: 1fr;
+  }
+  .investigation-intro {
+    padding: 14px;
+  }
+  .investigation-intro strong {
+    font-size: 14px;
+  }
+  .cell-detail {
+    font-size: 12px;
+  }
+}
+.assistant-consent {
+  padding: 16px 20px;
+  line-height: 1.7;
+}
+.hypothesis {
+  padding: 18px 20px;
+  border-top: 1px solid #e2e9f1;
+}
+.assistant-evidence {
+  padding: 16px 20px;
+}
+.alert-row .row-actions {
+  flex-wrap: wrap;
+  max-width: 370px;
+  justify-content: flex-end;
+}
+
+.sidebar {
+  padding-top: 18px;
+}
+.workspace-control {
+  margin-top: 18px;
+}
+.sidebar-search {
+  margin-bottom: 10px;
+}
+.sidebar nav {
+  gap: 2px;
+}
+.sidebar nav a {
+  min-height: 34px;
+  padding: 8px 11px;
+  font-size: 12px;
+}
+.sidebar nav a:nth-child(6),
+.sidebar nav a:nth-child(9) {
+  margin-top: 0;
+}
+
+.sidebar-timezone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px 12px;
+  font-size: 12px;
+  color: #c2ccda;
+}
+.sidebar-timezone select {
+  min-width: 0;
+  background: #223c5a;
+  color: white;
+  border: 1px solid #38516d;
+  border-radius: 6px;
+  padding: 4px;
+}
+
+.sidebar-timezone {
+  white-space: nowrap;
+  font-size: 11px;
+}
+.sidebar-timezone select {
+  font-size: 11px;
+  max-width: 110px;
+}
+.sidebar nav {
+  scrollbar-width: thin;
+  scrollbar-color: #58718e transparent;
+}
+
+@media (max-width: 950px) {
+  .sidebar-timezone {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .sidebar {
+    padding: 4px 8px;
+  }
+  .sidebar nav {
+    min-height: 44px;
+    flex: 1;
+  }
+  .sidebar nav a {
+    min-height: 44px;
+    padding: 10px 9px;
+  }
+}

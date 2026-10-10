@@ -1,5 +1,7 @@
 # SignalDesk 오픈소스 비교 리뷰
 
+> v0.3 follow-through (2026-10-10): R1–R7 are repaired and the service/notification/SLI/AI redesign is implemented within documented bounds. The report below preserves its original research-time findings. Current state: [redesign](REDESIGN.md), [verification](VERIFICATION.md), [roadmap](ROADMAP.md).
+
 검토일: 2026-10-09. 대상: v0.2.0, 커밋 `fbfbdeec79417d4d9ab5759f9a7b9c5042920c0d`.
 
 **현재 구현을 최대한 고도화된 운영 플랫폼이라고 평가할 수 없다.** 멀티 리전·모듈·인스턴스 식별, 데이터 없음 처리, 공유 PostgreSQL 실행과 기본 장애 조사 흐름은 구현했다. 그러나 성숙한 관측 제품의 탐색 기능, 알림 운영, 저장 엔진, AI 평가 운영과 비교하면 상당한 격차가 있다. 이번 검토에서는 기능 누락과 별개로 **수정이 필요한 정확성·조사 흐름 문제 7건**도 확인했다. 이 보고서는 리뷰 결과이며 해당 문제를 수정한 릴리스가 아니다.

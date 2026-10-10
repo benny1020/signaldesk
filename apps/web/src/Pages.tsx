@@ -1,3 +1,4 @@
+import { RuleEditor } from './Investigation';
 import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -29,6 +30,7 @@ import {
   Chart,
   ChartBoundary,
   Panel,
+  Dialog,
   Empty,
   Badge,
   number,
@@ -60,6 +62,8 @@ export type PageProps = {
   openForm: (kind: 'rule' | 'incident' | 'channel' | 'probe', alert?: Alert) => void;
   paused: boolean;
   notify: (message: string) => void;
+  updateScope: (patch: Record<string, string | undefined>, replace?: boolean) => void;
+  onRange: (from: number, to: number) => void;
 };
 export function Overview(p: PageProps) {
   const { data: d } = p,
@@ -93,8 +97,18 @@ export function Overview(p: PageProps) {
           }
         >
           <ChartBoundary>
-            <Chart title="요청량" series={[d.series.request_rate]} height={166} />
-            <Chart title="응답 지연" series={[d.series.latency_p95_ms]} height={166} />
+            <Chart
+              onRange={p.onRange}
+              title="요청량"
+              series={[d.series.request_rate]}
+              height={166}
+            />
+            <Chart
+              onRange={p.onRange}
+              title="응답 지연"
+              series={[d.series.latency_p95_ms]}
+              height={166}
+            />
           </ChartBoundary>
         </Panel>
         <Panel title="운영 상태" meta="서비스별 최근 수집값">
@@ -153,7 +167,12 @@ export function Overview(p: PageProps) {
         </Panel>
         <Panel title="오류율" meta="요청량이 있는 서비스의 가중 평균">
           <ChartBoundary>
-            <Chart title="오류 비율" series={[d.series.error_pct]} height={156} />
+            <Chart
+              onRange={p.onRange}
+              title="오류 비율"
+              series={[d.series.error_pct]}
+              height={156}
+            />
           </ChartBoundary>
         </Panel>
         <Panel
@@ -281,12 +300,22 @@ export function Infrastructure(p: PageProps) {
       <div className="two-column">
         <Panel title="CPU 추이" meta="호스트별 수집 간격의 CPU 사용률">
           <ChartBoundary>
-            <Chart title="CPU 사용률" series={hostSeries('cpu_pct')} height={240} />
+            <Chart
+              onRange={p.onRange}
+              title="CPU 사용률"
+              series={hostSeries('cpu_pct')}
+              height={240}
+            />
           </ChartBoundary>
         </Panel>
         <Panel title="메모리 추이" meta="호스트별 OS 기준 메모리 사용 비율">
           <ChartBoundary>
-            <Chart title="메모리 사용률" series={hostSeries('memory_pct')} height={240} />
+            <Chart
+              onRange={p.onRange}
+              title="메모리 사용률"
+              series={hostSeries('memory_pct')}
+              height={240}
+            />
           </ChartBoundary>
         </Panel>
       </div>
@@ -310,13 +339,21 @@ export function Logs(p: PageProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebounced(search);
-      const u = new URL(location.href);
-      if (search) u.searchParams.set('search', search);
-      else u.searchParams.delete('search');
-      history.replaceState(null, '', u);
+      if (search !== (new URLSearchParams(location.search).get('search') ?? ''))
+        p.updateScope({ search: search || undefined });
     }, 250);
     return () => clearTimeout(timer);
   }, [search]);
+  useEffect(() => {
+    const sync = () => {
+      const u = new URLSearchParams(location.search);
+      setSearch(u.get('search') ?? '');
+      setDebounced(u.get('search') ?? '');
+      setLevel(u.get('level') ?? '');
+    };
+    addEventListener('popstate', sync);
+    return () => removeEventListener('popstate', sync);
+  }, []);
   const params = { ...p.params, search: debounced, level, limit: 100 };
   const query = useInfiniteQuery({
     queryKey: ['logs', params],
@@ -379,9 +416,7 @@ export function Logs(p: PageProps) {
           value={level}
           onChange={(e) => {
             setLevel(e.target.value);
-            const u = new URL(location.href);
-            u.searchParams.set('level', e.target.value);
-            history.replaceState(null, '', u);
+            p.updateScope({ level: e.target.value || undefined });
           }}
         >
           <option value="">모든 수준</option>
@@ -448,9 +483,20 @@ export function Logs(p: PageProps) {
   );
 }
 export function Traces(p: PageProps) {
-  const roots = p.data.spans.filter((s) => !s.parentSpanId);
+  const q = useQuery({
+    queryKey: ['traces', p.params],
+    queryFn: () =>
+      request<import('../../../packages/contracts/src/index').AggregateResult>(
+        '/api/analysis/traces?' + queryString(p.params),
+      ),
+    refetchInterval: p.paused ? false : 5000,
+  });
   return (
-    <Panel title="트레이스 탐색" meta="요청별 전체 흐름과 지연 위치">
+    <Panel title="트레이스 탐색" meta="부모가 누락된 부분 트레이스도 표시합니다">
+      {q.error && <Empty>{q.error.message}</Empty>}
+      {q.data?.truncated && (
+        <div className="notice">트레이스 그룹 1,000개 상한입니다. 시간과 서비스를 좁히세요.</div>
+      )}
       <div className="table-scroll">
         <table>
           <thead>
@@ -458,52 +504,68 @@ export function Traces(p: PageProps) {
               <th>요청</th>
               <th>서비스</th>
               <th>상태</th>
-              <th className="numeric">소요 시간</th>
-              <th>수집 시각</th>
+              <th className="numeric">관측 경과</th>
+              <th className="numeric">스팬 수</th>
+              <th>관측 시각</th>
               <th>Trace ID</th>
             </tr>
           </thead>
           <tbody>
-            {roots.map((s) => (
-              <tr key={s.id}>
+            {q.data?.rows.map((r) => (
+              <tr key={String(r.trace_id)}>
                 <td>
                   <button
                     className="service-link"
-                    onClick={() => p.select({ type: 'trace', id: s.traceId })}
+                    onClick={() => p.select({ type: 'trace', id: String(r.trace_id) })}
                   >
-                    {s.name}
-                    <ArrowUpRight size={13} />
+                    {String(r.name)} <ArrowUpRight size={13} />
                   </button>
+                  {Number(r.root_count) === 0 && (
+                    <small className="cell-detail">부모 누락 · 부분 트레이스</small>
+                  )}
                 </td>
-                <td>{s.service}</td>
+                <td>{String(r.service)}</td>
                 <td>
-                  <Badge value={s.status} />
+                  <Badge value={Number(r.errors) > 0 ? 'error' : 'ok'} />
                 </td>
-                <td className="numeric">{number(s.durationMs, 0)} ms</td>
-                <td>{time(s.timestamp)}</td>
-                <td>
-                  <button
-                    className="text-button mono"
-                    onClick={() => p.select({ type: 'trace', id: s.traceId })}
-                  >
-                    {s.traceId.slice(0, 18)}
-                  </button>
+                <td className="numeric">
+                  {number(Number(r.last_seen) - Number(r.first_seen), 0)} ms
                 </td>
+                <td className="numeric">{number(Number(r.count), 0)}</td>
+                <td>{time(Number(r.first_seen))}</td>
+                <td className="mono">{String(r.trace_id).slice(0, 18)}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      {!roots.length && (
-        <Empty>트레이스가 없습니다. JSON 또는 OTLP JSON 트레이스를 전송하세요.</Empty>
+      {q.data && !q.data.rows.length && (
+        <Empty>트레이스가 없습니다. 선택 범위와 수집 상태를 확인하세요.</Empty>
       )}
     </Panel>
   );
 }
 export function Alerts(p: PageProps) {
-  const [tab, setTab] = useState('inbox'),
+  const owners = useQuery({
+    queryKey: ['alert-owners', p.params.workspace],
+    queryFn: () =>
+      request<{ services: { name: string; aliases: string[]; owner: { name: string } | null }[] }>(
+        '/api/catalog?' + queryString(p.params),
+      ),
+  });
+  const [editingRule, setEditingRule] = useState<
+      import('../../../packages/contracts/src/index').Rule | null
+    >(null),
+    [snoozeAlert, setSnoozeAlert] = useState<Alert | null>(null),
+    [snoozeReason, setSnoozeReason] = useState(''),
+    [snoozeMinutes, setSnoozeMinutes] = useState('30');
+  const [tab, setTab] = useState(new URLSearchParams(location.search).get('alertTab') ?? 'inbox'),
     [showResolved, setShowResolved] = useState(false),
     rows = p.data.alerts.filter((a) => showResolved || a.status === 'firing');
+  useEffect(
+    () => setTab(new URLSearchParams(location.search).get('alertTab') ?? 'inbox'),
+    [p.params],
+  );
   return (
     <>
       <div className="subtabs">
@@ -512,7 +574,14 @@ export function Alerts(p: PageProps) {
           ['rules', '알림 규칙'],
           ['deliveries', '전달 이력'],
         ].map(([key, label]) => (
-          <button className={tab === key ? 'active' : ''} onClick={() => setTab(key)} key={key}>
+          <button
+            className={tab === key ? 'active' : ''}
+            onClick={() => {
+              setTab(key);
+              p.updateScope({ alertTab: key });
+            }}
+            key={key}
+          >
             {label}
             {key === 'inbox' && (
               <span>{p.data.alerts.filter((a) => a.status === 'firing').length}</span>
@@ -548,21 +617,57 @@ export function Alerts(p: PageProps) {
                     <Badge value={a.status} />
                   </div>
                   <p>
-                    {a.service || '전체 서비스'} · {a.environment} · {a.region ?? '전체 리전'} ·{' '}
-                    {a.instanceId ?? '그룹'} ·{' '}
+                    {a.service || '전체 서비스'} ·{' '}
+                    {owners.data?.services.find(
+                      (s) => s.name === a.service || s.aliases.includes(a.service),
+                    )?.owner?.name ?? '담당 팀 미지정'}{' '}
+                    · {a.environment} · {a.region ?? '전체 리전'} · {a.instanceId ?? '그룹'} ·{' '}
                     {a.reason === 'no_data'
                       ? '최근 2분간 데이터 없음'
                       : '측정값 ' + number(a.value, 2)}{' '}
                     · {time(a.createdAt)}
                   </p>
                   <small>
-                    {a.acknowledged ? '담당자 확인됨' : '담당자 확인 대기'}
+                    {a.acknowledged
+                      ? '확인: ' + (a.acknowledgedBy ?? '담당자')
+                      : '담당자 확인 대기'}
+                    {a.snoozedBy && a.snoozedUntil > Date.now()
+                      ? ' · 중단: ' + a.snoozedBy + ' / ' + (a.snoozeReason || '사유 미기록')
+                      : ''}
                     {a.snoozedUntil > Date.now()
                       ? ' · ' + time(a.snoozedUntil) + '까지 알림 중지'
                       : ''}
                   </small>
                 </div>
                 <div className="row-actions">
+                  <button
+                    className="button secondary"
+                    onClick={() =>
+                      p.updateScope({
+                        page: 'logs',
+                        service: a.service,
+                        environment: a.environment,
+                        ...Object.fromEntries(
+                          ['module', 'region', 'zone', 'cluster', 'namespace', 'instanceId'].map(
+                            (k) => [k, a[k as keyof Alert] as string | undefined],
+                          ),
+                        ),
+                        from: String(
+                          Math.max(
+                            (a.resolvedAt ?? p.data.window.to) - 7 * 86400000,
+                            a.createdAt - 300000,
+                          ),
+                        ),
+                        to: String(a.resolvedAt ?? p.data.window.to),
+                        search: undefined,
+                        level: undefined,
+                        detail: undefined,
+                        detailId: undefined,
+                      })
+                    }
+                  >
+                    발생 시점 조사
+                  </button>
                   <button
                     className="button secondary"
                     disabled={a.acknowledged}
@@ -575,13 +680,18 @@ export function Alerts(p: PageProps) {
                   </button>
                   <button
                     className="button secondary"
-                    onClick={() =>
-                      void p.mutate(
-                        '/api/alerts/' + a.id,
-                        { snoozeMinutes: a.snoozedUntil > Date.now() ? 0 : 30 },
-                        'PATCH',
-                      )
-                    }
+                    onClick={() => {
+                      if (a.snoozedUntil > Date.now())
+                        void p.mutate(
+                          '/api/alerts/' + a.id,
+                          { snoozeMinutes: 0, reason: '중단 해제' },
+                          'PATCH',
+                        );
+                      else {
+                        setSnoozeAlert(a);
+                        setSnoozeReason('');
+                      }
+                    }}
                   >
                     {a.snoozedUntil > Date.now() ? '중지 해제' : '30분 중지'}
                   </button>
@@ -632,6 +742,9 @@ export function Alerts(p: PageProps) {
                   <tr key={r.id}>
                     <td>
                       <strong>{r.name}</strong>
+                      <button className="text-button" onClick={() => setEditingRule(r)}>
+                        편집 · v{r.revision ?? 1}
+                      </button>
                       <small>{r.pendingSince !== null ? '조건 지속 시간 확인 중' : ''}</small>
                     </td>
                     <td>
@@ -682,6 +795,44 @@ export function Alerts(p: PageProps) {
         </Panel>
       ) : (
         <Deliveries {...p} />
+      )}
+      {editingRule && <RuleEditor {...p} rule={editingRule} onClose={() => setEditingRule(null)} />}
+      {snoozeAlert && (
+        <Dialog title="알림 전송 일시 중단" onClose={() => setSnoozeAlert(null)}>
+          <form
+            className="form"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const result = await p.mutate(
+                '/api/alerts/' + snoozeAlert.id,
+                { snoozeMinutes: Number(snoozeMinutes), reason: snoozeReason },
+                'PATCH',
+              );
+              if (result) setSnoozeAlert(null);
+            }}
+          >
+            <label>
+              중단 기간 (분)
+              <input
+                required
+                type="number"
+                min="1"
+                max="1440"
+                value={snoozeMinutes}
+                onChange={(e) => setSnoozeMinutes(e.target.value)}
+              />
+            </label>
+            <label>
+              중단 사유
+              <textarea
+                required
+                value={snoozeReason}
+                onChange={(e) => setSnoozeReason(e.target.value)}
+              />
+            </label>
+            <button className="button">중단 기록</button>
+          </form>
+        </Dialog>
       )}
     </>
   );
@@ -836,14 +987,26 @@ export function Analytics(p: PageProps) {
       : null,
     groups = new Map<string, { count: number; service: string; traceId?: string }>();
   for (const l of p.data.logs.filter((l) => l.level === 'error')) {
-    const key = l.message.replace(/\d+/g, '#');
+    const key = [
+      l.service,
+      l.environment,
+      l.attributes['exception.type'] ?? '',
+      l.attributes['error.code'] ?? '',
+      l.message,
+    ].join(' / ');
     const item = groups.get(key) ?? { count: 0, service: l.service, traceId: l.traceId };
     item.count++;
     groups.set(key, item);
   }
-  const step = 300000,
+  const step = Math.max(
+      60000,
+      Math.ceil((p.data.window.to - p.data.window.from) / 48 / 60000) * 60000,
+    ),
     times = Array.from(
-      { length: Math.min(48, Math.ceil((p.data.window.to - p.data.window.from) / step)) },
+      {
+        length:
+          Math.ceil((p.data.window.to - Math.floor(p.data.window.from / step) * step) / step) + 1,
+      },
       (_, i) => Math.floor(p.data.window.from / step) * step + i * step,
     ),
     heat: Series[] = [...new Set(p.data.logs.map((l) => l.service))].map((service) => ({
@@ -898,7 +1061,7 @@ export function Analytics(p: PageProps) {
       </div>
       <Panel title="서비스별 오류 분포" meta="5분 구간의 오류 로그 수 · 최대 48구간">
         <ChartBoundary>
-          <Chart title="오류 히트맵" series={heat} heatmap height={240} />
+          <Chart onRange={p.onRange} title="오류 히트맵" series={heat} heatmap height={240} />
         </ChartBoundary>
       </Panel>
       <Panel title="그룹화된 오류" meta="메시지의 숫자를 정규화한 간단한 그룹화입니다.">
@@ -995,7 +1158,7 @@ export function AIWorkloads(p: PageProps) {
       <div className="two-column">
         <Panel title="토큰 사용" meta="호출별 입력·출력 토큰">
           <ChartBoundary>
-            <Chart title="토큰 추이" series={series} height={230} />
+            <Chart onRange={p.onRange} title="토큰 추이" series={series} height={230} />
           </ChartBoundary>
         </Panel>
         <Panel title="모델별 사용" meta="현재 범위의 수집 표본">

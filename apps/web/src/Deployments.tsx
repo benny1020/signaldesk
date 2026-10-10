@@ -22,36 +22,52 @@ export function ResourceScope({
   update: (patch: Record<string, string | undefined>) => void;
   truncated: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const active = Object.keys(resourceLabels).some((key) => params[key]);
   return (
     <div className="resource-context" aria-label="배포 범위">
       <span className="scope-caption">
         <Globe size={15} /> 배포 범위
       </span>
-      {Object.entries(resourceLabels).map(([key, label]) => (
-        <label key={key}>
-          <span>{label}</span>
-          <select
-            aria-label={label + ' 필터'}
-            value={String(params[key] ?? '')}
-            onChange={(e) => update({ [key]: e.target.value })}
-          >
-            <option value="">전체</option>
-            {[
-              ...new Set([
-                ...(params[key] ? [String(params[key])] : []),
-                ...resources.map((r) => r[key as keyof typeof resourceLabels]),
-              ]),
-            ]
-              .sort()
-              .map((value) => (
-                <option key={value} value={value}>
-                  {value === 'unknown' ? '미지정 (unknown)' : value}
-                </option>
-              ))}
-          </select>
-        </label>
-      ))}
+      {Object.entries(resourceLabels)
+        .filter(([key]) => key === 'region' || expanded || params[key])
+        .map(([key, label]) => (
+          <label key={key}>
+            <span>{label}</span>
+            <select
+              aria-label={label + ' 필터'}
+              value={String(params[key] ?? '')}
+              onChange={(e) => update({ [key]: e.target.value })}
+            >
+              <option value="">전체</option>
+              {[
+                ...new Set([
+                  ...(params[key] ? [String(params[key])] : []),
+                  ...resources
+                    .filter((r) =>
+                      ['service', 'environment', ...Object.keys(resourceLabels)]
+                        .filter((k) => k !== key)
+                        .every((k) => !params[k] || r[k as keyof ResourceSummary] === params[k]),
+                    )
+                    .map((r) => r[key as keyof typeof resourceLabels]),
+                ]),
+              ]
+                .sort()
+                .map((value) => (
+                  <option key={value} value={value}>
+                    {value === 'unknown' ? '미지정 (unknown)' : value}
+                  </option>
+                ))}
+            </select>
+          </label>
+        ))}
+      <button
+        className="text-button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}
+      >
+        {expanded ? '고급 필터 접기' : '모듈·인스턴스 필터'}
+      </button>
       {active && (
         <button
           className="text-button"
