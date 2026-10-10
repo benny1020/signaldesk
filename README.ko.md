@@ -68,4 +68,6 @@ npm run test:distributed
 
 [전체 README](README.md) · [기획·UX](docs/PRODUCT.md) · [설계](docs/ARCHITECTURE.md) · [리서치](docs/RESEARCH.md) · [비교 리뷰](docs/OSS_COMPARISON_REVIEW.md) · [API](docs/API.md) · [운영](docs/OPERATIONS.md) · [검증 기록](docs/VERIFICATION.md)
 
+2026-10-10 [당근·토스 운영 리서치](docs/DAANGN_TOSS_RESEARCH.md): 공식 발표 PDF 7편과 GitHub 6개 저장소를 바탕으로 서비스 오너십, 알림 조사 UX, SLI, 관측 플랫폼 확장과 AI 적용을 검토했습니다. 공개 운영 사례와 개발 예정 요구사항을 구분합니다.
+
 MIT License. 참조 제품의 UI 코드나 이미지는 복제하지 않았습니다.

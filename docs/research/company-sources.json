@@ -1,0 +1,366 @@
+{
+  "checked_on": "2026-10-10",
+  "baseline_signaldesk_commit": "b28df974b5e3e7c04007bb6f2b193921c7d00af3",
+  "research_report": "../DAANGN_TOSS_RESEARCH.md",
+  "scope": "Public team-specific historical practices; proposals are not runtime implementation or whole-company current architecture",
+  "pdf_sources": [
+    {
+      "title": "당근 개발자 플랫폼은 어떻게 발전하고 있을까",
+      "presentation_date": "2025-09-19",
+      "source_url": "https://daangn.notion.site/SRE-c62abc2b6f0347a4ace9ee9cdfc49b6b#27628c3a9f8f805b8e88df89da278e4e",
+      "sha256": "18b4e1b4b56cf2f4e73e95729cc9df7744018b13bcb4df1e72e577be42f22c0b",
+      "page_count": 59,
+      "relevant_pages_inspected": [6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+      "method": "Public rendered Notion PDF asset; text extraction and selected page rendering; no transcript-only claims",
+      "redistributed": false
+    },
+    {
+      "title": "AlertDelivery: grafana를 활용한 효율적인 알림 시스템 구축",
+      "presentation_date": "2023-06-15",
+      "source_url": "https://daangn.notion.site/SRE-c62abc2b6f0347a4ace9ee9cdfc49b6b#048c19f37a66497aa13c0f8b2ec21560",
+      "sha256": "b472e06dd8e32094ae7e4ffcc526a591f479878aca0004e26e289c21f3bff788",
+      "page_count": 24,
+      "relevant_pages_inspected": [11, 13, 14, 17, 18, 20, 21, 22, 23],
+      "method": "Public rendered Notion PDF asset; text extraction and selected page rendering; no transcript-only claims",
+      "redistributed": false
+    },
+    {
+      "title": "당근마켓 서비스를 모니터링하는 방법",
+      "presentation_date": "2023-06-15",
+      "source_url": "https://daangn.notion.site/SRE-c62abc2b6f0347a4ace9ee9cdfc49b6b#5fb834078c8f47bd843129cb25cec4b6",
+      "sha256": "86088498a623b9c670a67ba52653a1b13ba729f96d3a145154489bb5520df465",
+      "page_count": 32,
+      "relevant_pages_inspected": [15, 16, 17, 18, 24, 25, 26, 28, 29, 30],
+      "method": "Public rendered Notion PDF asset; text extraction and selected page rendering; no transcript-only claims",
+      "redistributed": false
+    },
+    {
+      "title": "프로젝트 오너십 관리를 통한 DevOps 기반 만들기",
+      "presentation_date": "2023-06-15",
+      "source_url": "https://daangn.notion.site/SRE-c62abc2b6f0347a4ace9ee9cdfc49b6b#cef363f18b77480cb882cd423c0adfde",
+      "sha256": "9dbe9d67187509cb7b36922fa28655cb9dfb72ec9c9dea6a4084970f01b7ba8b",
+      "page_count": 52,
+      "relevant_pages_inspected": [20, 21, 22, 23, 28, 29, 30, 31, 32, 33, 37, 47],
+      "method": "Public rendered Notion PDF asset; text extraction and selected page rendering; no transcript-only claims",
+      "redistributed": false
+    },
+    {
+      "title": "멋진 운영 경험을 위하여: Prometheus 레코딩 룰로 SLI 정하기",
+      "presentation_date": "2025-09-19",
+      "source_url": "https://daangn.notion.site/SRE-c62abc2b6f0347a4ace9ee9cdfc49b6b#27628c3a9f8f80098eabe7b66d6faf67",
+      "sha256": "2f0f16fc07913143b2aeea1efcf68795f307ceaab8928d371a0be8d214f46f64",
+      "page_count": 107,
+      "relevant_pages_inspected": [
+        50, 56, 57, 58, 59, 65, 66, 67, 68, 69, 70, 71, 72, 73, 96, 97, 98, 99, 100, 101, 102, 103,
+        105
+      ],
+      "method": "Public rendered Notion PDF asset; text extraction and selected page rendering; no transcript-only claims",
+      "redistributed": false
+    },
+    {
+      "title": "당근에서 Loki 1년간 운영기",
+      "presentation_date": "2025-09-19",
+      "source_url": "https://daangn.notion.site/SRE-c62abc2b6f0347a4ace9ee9cdfc49b6b#27628c3a9f8f801a89d2d65ee4a6ddbd",
+      "sha256": "05c1787214edcace160e83130befd78d52c2553f473e253ee53161fc25d73d51",
+      "page_count": 85,
+      "relevant_pages_inspected": [
+        34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56,
+        57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79,
+        80, 81, 82, 83, 84
+      ],
+      "method": "Public rendered Notion PDF asset; text extraction and selected page rendering; no transcript-only claims",
+      "redistributed": false
+    },
+    {
+      "title": "클릭! 클릭! 글로벌로 향하는 멀티 클러스터 지원 스토리",
+      "presentation_date": "2023-06-15",
+      "source_url": "https://daangn.notion.site/SRE-c62abc2b6f0347a4ace9ee9cdfc49b6b#93fb6bcdab3d487ab22a882dcf7d8690",
+      "sha256": "c02c404a023567cf19c3c3eb04cef8cc80c0bfb65223acab20881cd3eb346976",
+      "page_count": 56,
+      "relevant_pages_inspected": [14, 15, 16, 17, 19, 20, 21, 22, 31, 35],
+      "method": "Public rendered Notion PDF asset; text extraction and selected page rendering; no transcript-only claims",
+      "redistributed": false
+    }
+  ],
+  "web_sources": [
+    {
+      "team": "토스 서버플랫폼",
+      "title": "토스는 Gateway 이렇게 씁니다",
+      "published_date": "2023-10-12",
+      "date_status": "explicit article date",
+      "url": "https://toss.tech/article/slash23-server"
+    },
+    {
+      "team": "토스증권",
+      "title": "대규모 로그 처리도 OK! Elasticsearch 클러스터 개선기",
+      "published_date": "2023-10-12",
+      "date_status": "explicit article date",
+      "url": "https://toss.tech/article/slash23-data"
+    },
+    {
+      "team": "토스증권",
+      "title": "MSA 환경 Observability 높이기",
+      "published_date": null,
+      "date_status": "not displayed in accessed article",
+      "url": "https://toss.tech/article/MSA-observability"
+    },
+    {
+      "team": "토스페이먼츠",
+      "title": "레거시 인프라 작살내고 하이브리드 클라우드 만든 썰",
+      "published_date": "2026-01-20",
+      "date_status": "explicit article date",
+      "url": "https://toss.tech/article/42673"
+    },
+    {
+      "team": "토스",
+      "title": "토스가 특허 낸 리서치툴, TNS 제작기",
+      "published_date": "2025-07-04",
+      "date_status": "explicit article date",
+      "url": "https://toss.tech/article/Toss_Navigation_Score"
+    },
+    {
+      "team": "토스증권",
+      "title": "AI에게 투자정보를 말하게 하기까지",
+      "published_date": "2026-08-13",
+      "date_status": "explicit article date",
+      "url": "https://toss.tech/article/tech_talk_talk_1"
+    }
+  ],
+  "github_sources": [
+    {
+      "repo": "daangn/autopprof",
+      "sha": "f87ad098566ab2b1794aa0ecb58a4eec1f36edff",
+      "fork": false,
+      "archived": false,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "pushed_at": "2026-06-04T09:30:34Z",
+      "readme_path": "README.md",
+      "homepage": "",
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        },
+        {
+          "path": "autopprof.go",
+          "sha256": "1e54617ba781c77627fc376e0701bb6c658f8f7e6149b0f2959fd61d552844cf"
+        },
+        {
+          "path": "option.go",
+          "sha256": "c8775663a2652e715035a6078a17c62e86c478b75824f38ea18923ffd6f6193a"
+        },
+        {
+          "path": "report/slack.go",
+          "sha256": "cac58ce643bad98e89fd23f6bdd943eb524d102fd0fe102637ee19aef49d922a"
+        },
+        {
+          "path": "README.md",
+          "sha256": "8d514c60fd15648717908ff20457e28a8635d61f8aee651f837b7f39d638c2d2"
+        }
+      ]
+    },
+    {
+      "repo": "daangn/seed-design",
+      "sha": "22b68ce014c894edf286a2328a96250a36ab33a2",
+      "fork": false,
+      "archived": false,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "pushed_at": "2026-10-10T01:41:25Z",
+      "readme_path": "README.md",
+      "homepage": "https://seed-design.io",
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "44b8c61c1d0f4fad76c7755a21e44067893ab23f5bcc2a0d7fbfdf1794e8d160"
+        },
+        {
+          "path": "README.md",
+          "sha256": "b93ed98c534c82826d9a5888b64b8ff90fc1fea9171ddabe18162cc2838c788e"
+        },
+        {
+          "path": "packages/react-headless/dialog/src/useDialog.ts",
+          "sha256": "324d45f84853a601a303cdabefcbad91aa251ec94c4f5e58692a2f85100fb923"
+        }
+      ]
+    },
+    {
+      "repo": "daangn/webhook-cargo",
+      "sha": "ccb0af3c6c556a698636f06965b1a5cb8231dcd2",
+      "fork": false,
+      "archived": false,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2021-09-27T12:30:56Z",
+      "readme_path": "README.md",
+      "homepage": "",
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "8eb8bbe9c37b4f038b42eac3563ba52abea38a76e95ec4d26bc99eaf209281d2"
+        },
+        {
+          "path": "src/rules.ts",
+          "sha256": "3a1549c936bf2dd217adcda54050dc697eef1ef970b57e615b617342aa6dfba1"
+        },
+        {
+          "path": "src/worker.ts",
+          "sha256": "1d5f8111a331c4a50dafbacfa827f8816725bf67199772cde4ce0344f0438b19"
+        },
+        {
+          "path": "README.md",
+          "sha256": "43723aea50595c4e1c1621b4d208a58651f45baf160d7f1817c87dce956e9a83"
+        }
+      ]
+    },
+    {
+      "repo": "toss/github-actions-exporter",
+      "sha": "c6de1d6e0f2d107ba49318a86f9b678df2b78974",
+      "fork": true,
+      "archived": false,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2024-05-20T04:11:47Z",
+      "readme_path": "README.md",
+      "homepage": null,
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "13e2c6f332a21a58d0b802babf2bd049b5bc4015df22dedec51ce330b0616d00"
+        },
+        {
+          "path": "pkg/metrics/get_workflow_runs_from_github.go",
+          "sha256": "9f2cb7f23eab9f11390c6def0f570c2ca876198251222258d41510e6756a54ae"
+        },
+        {
+          "path": "README.md",
+          "sha256": "b3454fe620f5b53900a73de1f62f514669922b00cb0268cf29fd8512597d959f"
+        }
+      ]
+    },
+    {
+      "repo": "toss/kubectl-flame",
+      "sha": "ba509a78bbe6df3cb12d71491223c8153b6a3798",
+      "fork": true,
+      "archived": false,
+      "license": {
+        "key": "apache-2.0",
+        "name": "Apache License 2.0",
+        "spdx_id": "Apache-2.0",
+        "url": "https://api.github.com/licenses/apache-2.0",
+        "node_id": "MDc6TGljZW5zZTI="
+      },
+      "pushed_at": "2021-07-13T12:39:14Z",
+      "readme_path": "README.md",
+      "homepage": "",
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "0cec06e0e55fbc3dc5cee4fca9b607f66cb8f4e4dbcf3b3c013594dd156732e9"
+        },
+        {
+          "path": "cli/cmd/kubernetes/job/root.go",
+          "sha256": "a714c390cadf7aaba38e8c83216d4aaa3efe0c8cc0a736d3f89c15914ba185c2"
+        },
+        {
+          "path": "README.md",
+          "sha256": "3673f4bcf06a53489582aaf38b783085474b4e32845da7730df9e9f4356af5f1"
+        }
+      ]
+    },
+    {
+      "repo": "toss/overlay-kit",
+      "sha": "9f4e95ddbda28e2e6ee98cab971f3cdd11b2b8b2",
+      "fork": false,
+      "archived": false,
+      "license": {
+        "key": "mit",
+        "name": "MIT License",
+        "spdx_id": "MIT",
+        "url": "https://api.github.com/licenses/mit",
+        "node_id": "MDc6TGljZW5zZTEz"
+      },
+      "pushed_at": "2026-10-01T03:26:28Z",
+      "readme_path": "README.md",
+      "homepage": "https://overlay-kit.slash.page",
+      "inspected_files": [
+        {
+          "path": "LICENSE",
+          "sha256": "f0b6cba96e2c6ee48c865097c1c8c91298d8b70fe9a825a8b6703e1bf4d172b2"
+        },
+        {
+          "path": "README.md",
+          "sha256": "5cb7ea93f5d05812da7aab63f275e622f88ec8161d7ca836278d4c59ad5a56af"
+        },
+        {
+          "path": "packages/src/context/reducer.ts",
+          "sha256": "423e49a8879e79dae44a809d07b30687dd184c2c20c9ba0ca7e609b46e790a87"
+        }
+      ]
+    }
+  ],
+  "github_inventory_scope": {
+    "daangn_pages": [1, 2],
+    "toss_pages": [1],
+    "per_page": 100,
+    "claim": "Selected repository review, not an exhaustive survey of affiliated organizations"
+  },
+  "visual_review": [
+    {
+      "source": "AlertDelivery PDF",
+      "pages": [14, 18, 22]
+    },
+    {
+      "source": "2023 monitoring PDF",
+      "pages": [17]
+    },
+    {
+      "source": "Multicluster PDF",
+      "pages": [35]
+    },
+    {
+      "source": "Katalog PDF",
+      "pages": [37]
+    },
+    {
+      "source": "SLI PDF",
+      "pages": [70]
+    },
+    {
+      "source": "Loki PDF",
+      "pages": [69]
+    },
+    {
+      "source": "Toss MSA article",
+      "figures": ["clients_connection", "vector search results"]
+    }
+  ],
+  "not_done": [
+    "No production resource changes or external notification sends",
+    "No installation or execution of reviewed third-party code",
+    "No runtime feature implementation",
+    "No production adoption or current whole-company deployment inferred from GitHub forks",
+    "No benchmarks or measured UX studies performed"
+  ]
+}

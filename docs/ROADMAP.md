@@ -26,3 +26,17 @@ The [2026-10-09 comparison review](OSS_COMPARISON_REVIEW.md) leaves seven findin
 | AI evaluation operations  | Planned | Multiple versioned scores, dataset/experiment baseline, evaluation coverage and privacy-compatible runners                                                 |
 
 No external remediation, production failover or high-volume certification is inferred from local acceptance. See [multi-region responsibilities](MULTI_REGION.md).
+
+## Daangn and Toss research follow-through
+
+The [2026-10-10 company research](DAANGN_TOSS_RESEARCH.md) adds the following planned acceptance criteria. R1–R7 correctness repairs remain first. These requirements have not been implemented by the research commit.
+
+| Requirement                        | State   | Acceptance / next gate                                                                                                                          |
+| ---------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Service catalog and ownership      | Planned | Stable service/team IDs; owner, runbook, repository, criticality and supported regions; explicit orphan ownership                               |
+| Actionable notification flow       | Planned | Owner-aware routing, absolute investigation links, distinct ACK/snooze/resolve, actor/expiry/reason audit, repeat/recovery delivery receipts    |
+| Shared SLI definitions             | Planned | Versioned query definitions shared by UI and rules; traffic-weighted success, merged histograms, freshness and evaluation failure               |
+| Asynchronous service relationships | Planned | Queue/Kafka/DB/cache adapters; evidence, observation window and coverage per edge; searchable graph and equivalent table                        |
+| Observability platform health      | Planned | Ingest refusal/drop, queue age/depth, write lag, query limit/failure/latency and regional degradation visibility                                |
+| Measured investigation usability   | Planned | Operator tasks for alert ownership, API/log/trace correlation, URL restoration and missing-data interpretation; measured success/time/errors    |
+| AI failure feedback loop           | Planned | Structured failure categories linked to evaluator, dataset, prompt/model versions; evidence-backed assistance evaluated on historical incidents |

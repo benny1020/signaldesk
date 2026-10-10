@@ -1,5 +1,9 @@
 # Research and decisions · 2026-10-09
 
+## Korean engineering practice review · 2026-10-10
+
+[Daangn and Toss research](DAANGN_TOSS_RESEARCH.md) examines official monitoring, AlertDelivery, service ownership, multi-cluster, SLI, log-pipeline, service-relationship, UX and AI operations material. The report separates historical team-specific evidence from proposed SignalDesk requirements. Seven official presentation PDFs and six pinned GitHub repositories are tracked in the [source registry](research/company-sources.json). These are research additions; runtime changes and the seven open correctness findings are not resolved by this review.
+
 ## Product references
 
 | Reference                                                                                                 | Applied pattern                                              | License boundary                       |
