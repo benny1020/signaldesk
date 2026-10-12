@@ -1,5 +1,15 @@
 # Verification record
 
+## Five-region follow-through · 2026-10-13
+
+- Local `npm run check` passed formatting, TypeScript, 69 tests (zero failures/skips) and the production build. Five new tests cover same-named resources on five independent regional labels, same-service comparison, local/default versus explicit cross-region calls, region-isolated alert firing/recovery, absent/partial telemetry, environment/module boundaries and bounded large-inventory rendering.
+- New isolated SQLite preview on port 4323 seeded six application services, two instances per service in each of five regions and 15 regional host resources (75 total). Existing previews/Live databases were not reset. These are Demo fixtures on one computer, not physical regional deployments.
+- Fresh Chrome at 1280px: all five comparison columns fit within the workspace; selecting Seoul sets service/environment/module/region in the URL; returning to all regions preserves the service/environment/module/time scope. The comparison shows only Seoul checkout degraded.
+- Fresh Chrome at 390×844: document width remains 390px on deployment comparison and cross-region request-flow views; the 900px comparison table scrolls inside a 340px container. Temporary viewport override was reset.
+- Cross-region filter/list and inspector were verified together for `checkout-api → payment-worker`, Europe → North America, 10 paired observations. A browser-discovered stale inspector mismatch was fixed by selecting an edge in the active view and hiding selection/evidence outside visible filters. View selection waits for flow data to load. Console error/warning log was empty on the verified tab.
+- Screenshots: [same service across regions](screenshots/v04/five-regions.jpg), [cross-region call](screenshots/v04/cross-region-calls.jpg), [mobile](screenshots/v04/five-regions-mobile.jpg). Full operating scenarios and unimplemented artifact drift/expected-region/Collector health/geographic HA gates are in [five-region operating model](FIVE_REGION_OPERATIONS.md).
+- Pushed-head verification is tracked by the [CI workflow](https://github.com/benny1020/signaldesk/actions/workflows/ci.yml). Earlier v0.4 and v0.3 results below remain historical; no new physical WAN/HA or external provider experiment is claimed.
+
 ## v0.4 · 2026-10-12
 
 Development base: `83a4eaf7e5f833ecdf2d64453c1fc4715d42636c`. Release source is the exact commit shown by the [CI workflow](https://github.com/benny1020/signaldesk/actions/workflows/ci.yml); acceptance scripts are committed and run in CI. Previous v0.3 browser evidence below is historical.

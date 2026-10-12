@@ -22,7 +22,7 @@ echarts.use([
   AriaComponent,
   CanvasRenderer,
 ]);
-const palette = ['#2869d8', '#087f8c', '#b16b31', '#a658a6'];
+const palette = ['#2869d8', '#087f8c', '#b16b31', '#a658a6', '#64732c'];
 export default function Chart({
   series,
   title,

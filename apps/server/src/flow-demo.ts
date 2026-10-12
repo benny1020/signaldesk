@@ -1,14 +1,16 @@
 import type { Storage } from './storage.ts';
 import type { Span, TelemetryEvent } from '../../../packages/contracts/src/index.ts';
+import { exampleRegions } from '../../../packages/contracts/src/deployments.ts';
 /** Explicit fixtures: never contact any provider or overwrite live telemetry. */
 export async function seedRequestFlowDemo(store: Storage, now: number) {
   if (await store.setting('request-flow-demo-v1')) return;
   const events: TelemetryEvent[] = [],
-    regions = ['ap-northeast-2', 'us-east-1', 'eu-west-1'];
+    regions = exampleRegions.map((r) => r.id);
   for (let i = 0; i < 150; i++) {
     const timestamp = now - (149 - i) * 20000,
-      region = regions[i % 3],
-      paymentRegion = regions[(i + 1) % 3],
+      region = regions[i % regions.length],
+      // Regional infrastructure is independent. Only explicit examples cross its boundary.
+      paymentRegion = i % 15 === 0 ? regions[(i + 1) % regions.length] : region,
       outage = i > 112 && region === 'ap-northeast-2',
       recover = outage && i % 2 === 1;
     const traceId = 'flow-demo-' + i.toString().padStart(4, '0'),
@@ -41,7 +43,7 @@ export async function seedRequestFlowDemo(store: Storage, now: number) {
             : service === 'api-gateway'
               ? 'edge'
               : 'checkout',
-        zone: peerRegion + 'a',
+        zone: peerRegion + (i % 2 === 0 ? 'a' : 'b'),
         cluster: 'prod-' + peerRegion,
         namespace: 'commerce',
         instanceId: service + '-' + ((i % 2) + 1),
@@ -181,6 +183,9 @@ export async function seedRequestFlowDemo(store: Storage, now: number) {
         environment: 'production',
         region: paymentRegion,
         module: 'payments',
+        zone: paymentRegion + (i % 2 === 0 ? 'a' : 'b'),
+        cluster: 'prod-' + paymentRegion,
+        namespace: 'commerce',
         instanceId: 'payment-worker-' + ((i % 2) + 1),
         level: 'error',
         message: recover

@@ -1,5 +1,7 @@
 # Multiple instances, modules and regions
 
+The current product premise is the same application deployed on independent European, North American, Japanese, Singaporean and Seoul infrastructure. See [five-region operating model and implementation boundaries](FIVE_REGION_OPERATIONS.md) for identity, local versus cross-region calls, comparison UX and failure scenarios.
+
 v0.2 addresses two independent dimensions: the deployments being observed and the processes serving the platform. Both are implemented; geographically distributed production failover remains an operator acceptance exercise.
 
 ## Identity and observation

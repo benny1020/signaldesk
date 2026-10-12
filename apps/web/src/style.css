@@ -2396,6 +2396,85 @@ td small,
   margin-bottom: 15px;
   flex-wrap: wrap;
 }
+.regional-comparison-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.regional-comparison-toolbar p {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 0;
+  max-width: 70ch;
+}
+.regional-comparison {
+  width: 100%;
+  table-layout: fixed;
+}
+.regional-comparison th:first-child {
+  width: 150px;
+}
+.regional-comparison th small {
+  display: block;
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 400;
+}
+.regional-comparison td {
+  padding: 8px;
+  vertical-align: top;
+}
+.regional-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  color: var(--ink);
+  background: #f5f9fc;
+  border: 1px solid #dce7ee;
+  border-left: 3px solid #197b8d;
+  border-radius: 5px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.regional-cell.degraded {
+  border-left-color: #c23f57;
+  background: #fff4f6;
+}
+.regional-cell.unknown {
+  border-left-color: #78899d;
+  background: #f2f4f7;
+}
+.regional-cell:hover {
+  border-color: #315cc8;
+}
+.regional-cell:focus-visible {
+  outline: 2px solid #315cc8;
+  outline-offset: 2px;
+}
+.regional-cell-status {
+  font-weight: 700;
+}
+.regional-cell-status small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.regional-unobserved {
+  display: block;
+  min-width: 0;
+  padding: 12px;
+  color: var(--muted);
+}
 .inventory-toolbar > input {
   min-width: 200px;
   flex: 1;

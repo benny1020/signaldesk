@@ -211,6 +211,10 @@ Historical v0.3 manual browser acceptance covers the correlated navigation, aler
 
 The [v0.4 research and design](docs/REQUEST_FLOW_REDESIGN.md) compares OTel, Google Dapper, Uber/Jaeger, AWS, Azure, Tempo and SigNoz using official material and six pinned GitHub source snapshots. Research patterns are implemented in original code; no upstream product assets/code were copied. Current-source research does not assert production feature parity.
 
+The same application can be compared across independent European, North American, Japanese, Singaporean and Seoul deployments. The new Demo uses five locations, local internal calls by default and explicit cross-region examples. Compare service/environment/module rows, open a regional deployment and investigate cross-region calls. [The five-region operating model](docs/FIVE_REGION_OPERATIONS.md) separates implemented behavior from release/digest drift inventory and real geographic resilience work.
+
+![Same service across five regions · Demo, not a geographic deployment](docs/screenshots/v04/five-regions.jpg)
+
 ## Operational limits
 
 The [2026-10-09 OSS comparison review](docs/OSS_COMPARISON_REVIEW.md) identified R1–R7 correctness findings. They are repaired in v0.3 with regression tests and browser checks; broader parity gaps remain in the [roadmap](docs/ROADMAP.md). Passing CI does not establish parity with mature observability products or production readiness.

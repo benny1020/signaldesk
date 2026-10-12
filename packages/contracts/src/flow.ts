@@ -6,6 +6,16 @@ export type FlowIdentity = {
   module: string;
 };
 export type FlowNode = FlowIdentity & { id: string; owner: string | null; regions?: string[] };
+export function crossesRegion(source?: FlowIdentity, target?: FlowIdentity) {
+  const known = (region: string) => !['unknown', 'unobserved', 'all'].includes(region);
+  return !!(
+    source?.type === 'workload' &&
+    target?.type === 'workload' &&
+    known(source.region) &&
+    known(target.region) &&
+    source.region !== target.region
+  );
+}
 export type FlowEdge = {
   id: string;
   source: string;

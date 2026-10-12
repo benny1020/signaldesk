@@ -20,8 +20,14 @@ import type { PageProps } from '../Pages';
 import { request, queryString } from '../api';
 import { Chart, Empty, number, time } from '../components';
 import { DependencyRules } from './DependencyRules';
+import { crossesRegion } from '../../../../packages/contracts/src/flow';
 const Canvas = lazy(() => import('./FlowCanvas'));
 const Heatmap = lazy(() => import('./LatencyHeatmap'));
+const matchesView = (edge: FlowEdge, mode: string, source?: FlowNode, target?: FlowNode) =>
+  mode === 'all' ||
+  mode === edge.direction ||
+  (mode === 'failures' && edge.errors > 0) ||
+  (mode === 'cross-region' && crossesRegion(source, target));
 export function RequestFlow(p: PageProps) {
   const params = { ...p.params, from: p.data.window.from, to: p.data.window.to };
   const query = useQuery({
@@ -35,8 +41,7 @@ export function RequestFlow(p: PageProps) {
     [focus, setFocus] = useState<FlowNode | null>(null),
     [regionsExpanded, setRegionsExpanded] = useState(false);
   const mode = String(p.params.flowView ?? 'all');
-  const data = query.data,
-    selected = data?.edges.find((e) => e.id === data.selectedEdge);
+  const data = query.data;
   const edges = useMemo(
     () =>
       data?.edges.filter((e) => {
@@ -48,7 +53,7 @@ export function RequestFlow(p: PageProps) {
           n?.module === focus?.module &&
           (focus?.region === 'all' || n?.region === focus?.region);
         return (
-          (mode === 'all' || mode === e.direction || (mode === 'failures' && e.errors > 0)) &&
+          matchesView(e, mode, source, target) &&
           (!focus || focused(source) || focused(target)) &&
           [source?.name, target?.name, source?.region, target?.region, e.route]
             .join(' ')
@@ -58,6 +63,7 @@ export function RequestFlow(p: PageProps) {
       }) ?? [],
     [data, mode, focus, search],
   );
+  const selected = edges.find((e) => e.id === data?.selectedEdge);
   const select = (e: FlowEdge) =>
     p.updateScope({ edge: e.id, from: String(p.data.window.from), to: String(p.data.window.to) });
   const node = (id?: string) => data?.nodes.find((n) => n.id === id);
@@ -164,14 +170,19 @@ export function RequestFlow(p: PageProps) {
             ['all', '전체 흐름'],
             ['inbound', '진입 API'],
             ['outbound', '하위 호출'],
+            ['cross-region', '리전 간 호출'],
             ['failures', '실패 관측'],
           ].map(([key, title]) => (
             <button
               key={key}
+              disabled={!data}
               aria-pressed={mode === key}
               onClick={() => {
                 setFocus(null);
-                p.updateScope({ flowView: key === 'all' ? undefined : key });
+                const next = data?.edges.find((e) =>
+                  matchesView(e, key, node(e.source), node(e.target)),
+                );
+                p.updateScope({ flowView: key === 'all' ? undefined : key, edge: next?.id });
               }}
             >
               {title}
@@ -323,6 +334,12 @@ export function RequestFlow(p: PageProps) {
                       <br />
                       {node(selected.source)?.module} · {node(selected.source)?.environment}
                     </div>
+                    {crossesRegion(node(selected.source), node(selected.target)) && (
+                      <div className="flow-boundary">
+                        리전 간 내부 호출입니다. 호출 지연에는 네트워크 대기와 상대 서비스 처리가
+                        포함됩니다.
+                      </div>
+                    )}
                     <div className="flow-result">
                       <strong>{percent(selected.errors, selected.count)}</strong>
                       <span>관측 실패율 / {number(selected.count, 0)}건</span>

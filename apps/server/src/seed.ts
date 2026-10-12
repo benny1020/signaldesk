@@ -1,5 +1,6 @@
 import type { Storage } from './storage.ts';
 import { seedRequestFlowDemo } from './flow-demo.ts';
+import { exampleRegions } from '../../../packages/contracts/src/deployments.ts';
 import { resourceKey } from '../../../packages/contracts/src/index.ts';
 import type {
   TelemetryEvent,
@@ -163,7 +164,7 @@ export async function seedDemo(store: Storage, now = Date.now()) {
                 : { 'peer.service': 'auth-service' },
         });
   }
-  const regions = ['ap-northeast-2', 'us-east-1', 'eu-west-1'];
+  const regions = exampleRegions.map((r) => r.id);
   const resource = (service: string, region: string, replica: number) => ({
     module: (
       {
@@ -193,7 +194,7 @@ export async function seedDemo(store: Storage, now = Date.now()) {
             },
             unhealthy =
               e.service === 'checkout-api' &&
-              index === 0 &&
+              region === 'ap-northeast-2' &&
               replica === 0 &&
               e.timestamp > now - 15 * 60000;
           expanded.push({
@@ -202,7 +203,7 @@ export async function seedDemo(store: Storage, now = Date.now()) {
             id: e.id + '-' + index + '-' + replica,
             value:
               e.name === 'request_rate'
-                ? e.value * [0.5, 0.3, 0.2][index]
+                ? e.value * [0.15, 0.3, 0.15, 0.15, 0.25][index]
                 : e.name === 'error_pct' && !unhealthy
                   ? 0.12
                   : e.name === 'latency_p95_ms' && e.service === 'checkout-api' && !unhealthy
@@ -212,11 +213,11 @@ export async function seedDemo(store: Storage, now = Date.now()) {
         }
     else {
       const index = Number(e.traceId?.match(/\d+$/)?.[0] ?? 0),
-        sourceRegion = Math.floor(index / 6) % 3,
+        sourceRegion = Math.floor(index / 6) % regions.length,
         region =
           regions[
-            e.kind === 'span' && e.name === 'payment.authorize'
-              ? (sourceRegion + 1) % 3
+            e.kind === 'span' && e.name === 'payment.authorize' && index % 30 === 0
+              ? (sourceRegion + 1) % regions.length
               : sourceRegion
           ],
         replica = Math.floor(index / 18) % 2;

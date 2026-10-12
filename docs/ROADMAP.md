@@ -24,6 +24,8 @@ Use [verification](VERIFICATION.md), [operations](OPERATIONS.md) and [regional d
 
 ## v0.4 remaining gates
 
+Five-region follow-through: same-service/environment/module region comparison, scoped deployment drilldown, cross-region internal call filtering and local-by-default five-location Demo are implemented. Artifact/release/config drift inventory, expected-region onboarding, regional Collector queue telemetry, provider incident correlation and actual geographic acceptance remain future work. See [operating model](FIVE_REGION_OPERATIONS.md).
+
 Implemented: explicit boundary spans, request map, route heatmap, pairing/dedup, customer-response correlation, observed dependency rules, local executable HTTP example and SQLite/PostgreSQL parity. Fresh desktop/mobile map/heatmap/keyboard/drilldown checks are recorded in VERIFICATION.md. Remaining acceptance: real-service instrumentation and propagation across queues/async libraries; high-cardinality/concurrent SQL plans; pre-sampling RED metric adapters; production timeout/retry/circuit-breaker failure drills; geographic HA and exporter coverage.
 
 AI next step: use selected flow facts as cited investigation evidence (retry growth, dependency timeout, correlated customer failures, missing counterpart coverage). Require source links and distinguish observation from hypothesis. Flow-based AI root-cause inference, critical-path/self-time algorithms and automatic remediation are not implemented in v0.4. Overlapping child durations must never be naively summed into parent critical path.
