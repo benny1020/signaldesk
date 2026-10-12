@@ -50,9 +50,7 @@ const FlowCard = memo(function FlowCard({ data }: NodeProps<Node<NodeData>>) {
       </div>
       <strong title={n.name}>{n.name}</strong>
       <span className="flow-node-place">
-        {n.type === 'workload'
-          ? `${n.region === 'all' ? n.regions?.length + '개 리전' : n.region} / ${n.module}`
-          : '호출하는 쪽에서 측정'}
+        {n.type === 'workload' ? `${n.region} / ${n.module}` : '호출하는 쪽에서 측정'}
       </span>
       <div className="flow-node-count">
         <span>

@@ -211,6 +211,8 @@ The [v0.4 research and design](docs/REQUEST_FLOW_REDESIGN.md) compares OTel, Goo
 
 The same application can be compared across independent European, North American, Japanese, Singaporean and Seoul deployments. Application services call internal services within their own region and then external dependencies; there are no inter-region application calls in this operating model. Regional telemetry feeds the central comparison workspace. A geographic overview pairs an offline world map with an Asian inset so nearby regions stay readable. Select a region to inspect its observed status and metrics, then open regional deployments, logs or request flows with the investigation scope preserved. Location markers use representative points, not facility locations; unregistered region codes stay in the equivalent selectable list. The new Demo keeps every trace's application spans/logs in one region. Compare service/environment/module rows and investigate each region's internal/external calls. [The five-region operating model](docs/FIVE_REGION_OPERATIONS.md) separates implemented behavior from release/digest drift inventory and real geographic resilience work.
 
+Each region is a separately deployed application stack. Identical service names retain separate regional nodes in request flows; the graph does not collapse them into a shared running service.
+
 ![Geographic region overview with an Asian inset · Demo](docs/screenshots/v04/region-atlas.jpg)
 
 ![Same service across five regions · Demo, not a geographic deployment](docs/screenshots/v04/five-regions.jpg)

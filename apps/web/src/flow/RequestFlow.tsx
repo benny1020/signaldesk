@@ -39,8 +39,7 @@ export function RequestFlow(p: PageProps) {
   });
   const [map, setMap] = useState(true),
     [search, setSearch] = useState(''),
-    [focus, setFocus] = useState<FlowNode | null>(null),
-    [regionsExpanded, setRegionsExpanded] = useState(true);
+    [focus, setFocus] = useState<FlowNode | null>(null);
   // Older saved cross-region-only views now open the ordinary regional flows.
   const mode = ['inbound', 'outbound', 'failures'].includes(String(p.params.flowView))
     ? String(p.params.flowView)
@@ -55,7 +54,7 @@ export function RequestFlow(p: PageProps) {
           n?.name === focus?.name &&
           n?.environment === focus?.environment &&
           n?.module === focus?.module &&
-          (focus?.region === 'all' || n?.region === focus?.region);
+          n?.region === focus?.region;
         return (
           matchesView(e, mode) &&
           (!focus || focused(source) || focused(target)) &&
@@ -75,31 +74,6 @@ export function RequestFlow(p: PageProps) {
     selectedTarget = node(selected?.target),
     observed = selectedSource?.type === 'workload' ? selectedSource : selectedTarget,
     internal = selectedSource?.type === 'workload' && selectedTarget?.type === 'workload';
-  const graph = useMemo(() => {
-    if (!data || regionsExpanded) return { data, edges, selected };
-    const groups = new Map<string, FlowNode[]>(),
-      mapping = new Map<string, string>();
-    for (const n of data.nodes) {
-      const k = JSON.stringify([n.type, n.name, n.environment, n.module]);
-      groups.set(k, [...(groups.get(k) ?? []), n]);
-    }
-    const nodes = [...groups.values()].map((group) => {
-      const n = group[0];
-      for (const x of group) mapping.set(x.id, n.id);
-      const regions = [...new Set(group.map((x) => x.region))];
-      return { ...n, region: regions.length > 1 ? 'all' : n.region, regions };
-    });
-    const convert = (e: FlowEdge) => ({
-      ...e,
-      source: mapping.get(e.source)!,
-      target: mapping.get(e.target)!,
-    });
-    return {
-      data: { ...data, nodes },
-      edges: edges.map(convert),
-      selected: selected ? convert(selected) : undefined,
-    };
-  }, [data, edges, selected, regionsExpanded]);
   const inbound = data?.edges.filter((e) => e.direction === 'inbound') ?? [],
     outbound = data?.edges.filter((e) => e.direction === 'outbound') ?? [];
   const total = (items: FlowEdge[], key: 'count' | 'errors' | 'retries') =>
@@ -123,7 +97,7 @@ export function RequestFlow(p: PageProps) {
           <Network size={24} />
           <div>
             <strong>고객 요청에서 외부 의존성까지</strong>
-            <p>리전별 내부 서비스와 외부 API 호출을 고객 응답에 연결해 봅니다.</p>
+            <p>각 리전은 독립 배포입니다. 해당 리전의 내부 서비스와 외부 API 호출을 조사합니다.</p>
           </div>
         </div>
         <button className="text-button" onClick={() => p.navigate('metrics')}>
@@ -209,9 +183,7 @@ export function RequestFlow(p: PageProps) {
       </div>
       {focus && (
         <div className="flow-focus">
-          {focus.name}의 연결{' '}
-          {focus.region !== 'unobserved' &&
-            ' / ' + (focus.region === 'all' ? '모든 리전' : focus.region)}
+          {focus.name}의 연결 {focus.region !== 'unobserved' && ' / ' + focus.region}
           <button className="text-button" onClick={() => setFocus(null)}>
             전체로 복귀
           </button>
@@ -223,7 +195,7 @@ export function RequestFlow(p: PageProps) {
                   page: 'services',
                   service: focus.name,
                   environment: focus.environment,
-                  region: focus.region === 'all' ? undefined : focus.region,
+                  region: focus.region,
                   module: focus.module,
                   instanceId: undefined,
                   cluster: undefined,
@@ -293,23 +265,14 @@ export function RequestFlow(p: PageProps) {
                 {map ? (
                   <>
                     <div className="flow-layout-toggle">
-                      <button
-                        className="text-button"
-                        aria-pressed={regionsExpanded}
-                        onClick={() => {
-                          setFocus(null);
-                          setRegionsExpanded(!regionsExpanded);
-                        }}
-                      >
-                        {regionsExpanded ? '서비스별로 묶기' : '리전별로 펼치기'}
-                      </button>
+                      <span>리전별 독립 배포</span>
                       <span>선택 시 해당 route·리전의 수치 확인</span>
                     </div>
                     <Suspense fallback={<Empty>지도를 불러오고 있습니다…</Empty>}>
                       <Canvas
-                        data={graph.data!}
-                        edges={graph.edges}
-                        selected={graph.selected}
+                        data={data}
+                        edges={edges}
+                        selected={selected}
                         onSelect={select}
                         onFocus={setFocus}
                       />

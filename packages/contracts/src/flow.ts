@@ -5,7 +5,7 @@ export type FlowIdentity = {
   region: string;
   module: string;
 };
-export type FlowNode = FlowIdentity & { id: string; owner: string | null; regions?: string[] };
+export type FlowNode = FlowIdentity & { id: string; owner: string | null };
 export type FlowEdge = {
   id: string;
   source: string;

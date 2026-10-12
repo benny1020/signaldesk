@@ -2,6 +2,8 @@
 
 2026-10-13. 제품의 운영 전제는 **유럽·북미·일본·싱가포르·서울에 같은 논리 서비스와 모듈을 배포하고, 각 리전의 인프라는 독립 운영하며 업무 API의 리전 간 호출은 없다**는 것이다. 각 고객 요청은 해당 리전 안의 내부 서비스를 거쳐 외부 API를 호출한다. 같은 소스/이미지를 배포해도 트래픽, 외부 API 경로, DB·큐·캐시, 설정, 배포 시점과 장애 상태는 다를 수 있다.
 
+각 리전은 별도로 전개된 애플리케이션 스택이다. 같은 서비스명은 같은 논리 역할을 뜻하며 실행 중인 하나의 서비스를 공유한다는 뜻이 아니다. 다른 리전의 API·worker·DB·큐·캐시를 호출하거나 그 리전의 요청 처리에 의존하지 않는다. 공통 화면에서 배포를 비교하더라도 요청 흐름의 서비스 노드는 리전별로 유지한다.
+
 ## 공통 서비스와 지역 배포를 구분한다
 
 | 책임         | 공통으로 관리                                          | 리전별로 관리                                                          |
@@ -20,46 +22,46 @@
 
 ```mermaid
 flowchart TB
-  Router[외부 클라이언트의 리전별 요청] --> EUAPI
-  Router --> NAAPI
-  Router --> JPAPI
-  Router --> SGAPI
-  Router --> KRAPI
+  EUClient[유럽 배포의 클라이언트] --> EUAPI
+  NAClient[북미 배포의 클라이언트] --> NAAPI
+  JPClient[일본 배포의 클라이언트] --> JPAPI
+  SGClient[싱가포르 배포의 클라이언트] --> SGAPI
+  KRClient[서울 배포의 클라이언트] --> KRAPI
   subgraph EU[유럽의 독립 인프라]
     EUAPI[동일 API] --> EUWorker[동일 내부 서비스]
     EUWorker --> EUExternal[외부 API 호출]
-    EUAPI --> EUCollector[지역 Collector + 영속 큐]
-    EUWorker --> EUCollector
+    EUAPI -. 관측 데이터 .-> EUCollector[지역 Collector + 영속 큐]
+    EUWorker -.-> EUCollector
   end
   subgraph NA[북미의 독립 인프라]
     NAAPI[동일 API] --> NAWorker[동일 내부 서비스]
     NAWorker --> NAExternal[외부 API 호출]
-    NAAPI --> NACollector[지역 Collector + 영속 큐]
-    NAWorker --> NACollector
+    NAAPI -. 관측 데이터 .-> NACollector[지역 Collector + 영속 큐]
+    NAWorker -.-> NACollector
   end
   subgraph JP[일본의 독립 인프라]
     JPAPI[동일 API] --> JPWorker[동일 내부 서비스]
     JPWorker --> JPExternal[외부 API 호출]
-    JPAPI --> JPCollector[지역 Collector + 영속 큐]
-    JPWorker --> JPCollector
+    JPAPI -. 관측 데이터 .-> JPCollector[지역 Collector + 영속 큐]
+    JPWorker -.-> JPCollector
   end
   subgraph SG[싱가포르의 독립 인프라]
     SGAPI[동일 API] --> SGWorker[동일 내부 서비스]
     SGWorker --> SGExternal[외부 API 호출]
-    SGAPI --> SGCollector[지역 Collector + 영속 큐]
-    SGWorker --> SGCollector
+    SGAPI -. 관측 데이터 .-> SGCollector[지역 Collector + 영속 큐]
+    SGWorker -.-> SGCollector
   end
   subgraph KR[서울의 독립 인프라]
     KRAPI[동일 API] --> KRWorker[동일 내부 서비스]
     KRWorker --> KRExternal[외부 API 호출]
-    KRAPI --> KRCollector[지역 Collector + 영속 큐]
-    KRWorker --> KRCollector
+    KRAPI -. 관측 데이터 .-> KRCollector[지역 Collector + 영속 큐]
+    KRWorker -.-> KRCollector
   end
-  EUCollector --> Central[중앙 관측 API / 조회·평가]
-  NACollector --> Central
-  JPCollector --> Central
-  SGCollector --> Central
-  KRCollector --> Central
+  EUCollector -.-> Central[중앙 관측 API / 조회·평가]
+  NACollector -.-> Central
+  JPCollector -.-> Central
+  SGCollector -.-> Central
+  KRCollector -.-> Central
 ```
 
 각 지역의 내부 API, worker, DB·큐·캐시는 해당 지역 안에서 호출한다. 다른 리전의 업무 서비스로 연결되는 경로는 없다. 지역 Collector는 로그·메트릭·스팬을 관측 플랫폼으로 전송하고, 중앙 화면에서 같은 서비스의 지역별 상태와 외부 API 결과를 비교한다. 업무 요청 흐름과 관측 데이터 수집 경로를 구분한다. 이 그림은 운영 설계이며 실제 다섯 지역의 프로비저닝 증거가 아니다. 클라이언트의 지역 선택·트래픽 라우팅은 애플리케이션 인프라의 책임이며 SignalDesk가 제어하지 않는다.
@@ -73,7 +75,7 @@ flowchart TB
 | 배포 및 인스턴스  | 서비스·환경·모듈별 리전 비교 표, 관측 상태/데이터 지연, 인스턴스 수, 완전한 관측일 때의 요청량·가중 오류율, 최대 인스턴스 p95 |
 | 리전 비교 표의 셀 | 해당 service/environment/module/region 범위로 좁히고 기존 zone/cluster/namespace/instance/edge 선택 해제; 시간 유지           |
 | 모든 리전 비교    | 지역과 하위 인프라 필터를 해제해 선택 서비스·환경·모듈을 지역 간 비교                                                         |
-| 요청 흐름         | 기본 리전별 구분, 각 지역의 진입 API→내부 서비스→외부 API, source→target 관측 경계; 선택적으로 서비스별 집계                  |
+| 요청 흐름         | 리전별로 별도 서비스 노드 유지, 각 지역의 진입 API→내부 서비스→외부 API, source→target 관측 경계                              |
 | 트레이스·로그     | 조사 시간/서비스/환경/리전/모듈을 연결; exact trace는 요청에 참여한 서비스·모듈의 스팬을 함께 조사                            |
 | 알림·전달 정책    | `groupBy=region` 또는 resource로 평가; 리전별 전달·유지보수·ACK·복구 상태를 유지                                              |
 
@@ -89,7 +91,7 @@ flowchart TB
 
 지역 상태는 현재 목록의 활성 리소스를 기준으로 `주의 > 데이터 지연·미수집 > 정상 관측` 순으로 표시하며, 제외된 리소스는 집계하지 않는다. 서비스 요청 합계는 내부 호출 중복을 포함하므로 고객 진입 요청량이 아니다. 앱 인스턴스 중 하나라도 요청량/오류율이 누락되면 완전한 합계/가중 오류율을 표시하지 않는다. 호스트만 존재하는 지역에는 API 지표를 만들지 않는다. p95는 관측된 최대 인스턴스 p95이며 통합 분위수가 아니다. 지도 집계는 비교 표의 50행·12리전 상한을 사용하지 않으며, 지역 목록은 12개씩 페이지를 나눈다. API 인벤토리 자체가 잘리면 지도에도 경고한다.
 
-지도 바탕은 [Natural Earth 1:110m land](https://github.com/nvkelso/natural-earth-vector/blob/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_110m_land.geojson)의 public-domain 좌표를 고정 버전에서 SVG 경로로 변환한 것이다. `node scripts/generate-world-map.mjs`로 재생성한다. 경도·위도를 선형으로 배치하는 투영을 사용하며 실제 면적·거리 분석용이 아니다. 외부 지도 타일/API 키/브라우저 위치 정보가 필요하지 않고, 실제 호출을 확인하지 않은 지역 간 연결선은 그리지 않는다. 지도와 CSS는 배포 화면에서만 지연 로딩된다. [출처와 이용 조건](../THIRD_PARTY_NOTICES.md)를 참고한다.
+지도 바탕은 [Natural Earth 1:110m land](https://github.com/nvkelso/natural-earth-vector/blob/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_110m_land.geojson)의 public-domain 좌표를 고정 버전에서 SVG 경로로 변환한 것이다. `node scripts/generate-world-map.mjs`로 재생성한다. 경도·위도를 선형으로 배치하는 투영을 사용하며 실제 면적·거리 분석용이 아니다. 외부 지도 타일/API 키/브라우저 위치 정보가 필요하지 않고, 리전 간 연결선은 그리지 않는다. 지도와 CSS는 배포 화면에서만 지연 로딩된다. [출처와 이용 조건](../THIRD_PARTY_NOTICES.md)를 참고한다.
 
 비교 표는 최대 50개 서비스·환경·모듈 행과 12개 리전을 표시한다. 더 큰 인벤토리는 전체 개수와 표시 상한을 알리고 검색/범위 필터로 좁히도록 한다. 인벤토리 API 자체의 상한도 별도로 표시한다.
 

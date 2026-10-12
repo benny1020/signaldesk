@@ -1,5 +1,12 @@
 # Verification record
 
+## Independent regional deployment nodes · 2026-10-13
+
+- Clarified that every region runs a separately deployed application stack: service names and code can match, but running APIs/workers and DB/queue/cache infrastructure are independent. Removed the graph's cross-region service-collapsing option and its synthetic `region=all` nodes. All-region status comparison remains available; request-flow workload nodes always retain their actual region/environment/module identity.
+- Chrome at 1280×1000 showed five separate `payment-worker` nodes with the same service name and distinct regional identities; the merge option was absent. Selecting the Japan node restricted the connection list to Japan → Japan internal traffic and provider attempts observed from Japan. Opening service metrics preserved `region=ap-northeast-1`, `environment=production` and `module=payments`.
+- The operating diagram now gives each region a separate client entry and distinguishes business calls from Collector telemetry with dotted observation paths. There are no business-call links between regional stacks. Updated README and [operating model](FIVE_REGION_OPERATIONS.md) describe separate deployments rather than a shared running service.
+- Local `npm run check` passed formatting, TypeScript, all 70 tests (zero failures/skips) and the production build. At 390×844 both map and connection list retained document width 390px. Console warning/error entries were empty, the temporary viewport override was reset and the [request-flow screenshot](screenshots/v04/region-local-flow.jpg) was refreshed with Demo data.
+
 ## Region-local business requests · 2026-10-13
 
 - The operating premise is now explicit: Europe, North America, Japan, Singapore and Seoul run the same application on independent infrastructure; business API calls stay inside their originating region before reaching external dependencies. Earlier cross-region application examples below record a superseded assumption, not the current topology.
