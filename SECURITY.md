@@ -1,6 +1,6 @@
 # Security
 
-This is a v0.2 self-hosted baseline. Local mode must remain loopback-only. Remote binding requires token mode, strong workspace-scoped tokens and a stable 32-byte channel encryption key. Put remote access behind HTTPS; do not expose the Node port directly on the internet.
+This is a v0.4 self-hosted internal-pilot release. Local mode must remain loopback-only. Remote binding requires token mode, strong workspace-scoped tokens and a stable 32-byte channel encryption key. Put remote access behind HTTPS; do not expose the Node port directly on the internet.
 
 Tokens live in environment configuration; browser tokens are session-scoped. This is not SSO or managed user provisioning. Encrypted channel URLs require a separately protected key in token mode. Local mode stores its generated key in the local database, providing a convenience baseline rather than protection against database theft.
 

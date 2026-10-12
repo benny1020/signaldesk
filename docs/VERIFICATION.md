@@ -23,6 +23,12 @@ Production bundles: app about 157kB gzip, lazy React Flow about 60kB gzip, EChar
 
 [Research/design](REQUEST_FLOW_REDESIGN.md) and [instrumentation/limitations](REQUEST_FLOW_INSTRUMENTATION.md) distinguish implemented behavior from production extension work.
 
+### Public-release preflight · 2026-10-12
+
+At source `1bf3fc188812f407ec38130994ac52896d9d5039`, Gitleaks 8.30.1 (official release archive checksum verified) scanned all 12 reachable Git commits and an exported archive of the 130 tracked files. Its default rules reported one candidate: the documented `CHANNEL_KEY=replace-with-64-hex-characters` placeholder in `.env.example`. After manually checking the historical source, a temporary allowlist matched only that exact secret string and example-file path; both scans passed. No database, private-key, credentials or HAR file was tracked. OCR of the 18 historical screenshots followed by credential-pattern scanning reported no candidates; OCR is a partial text check, not a guarantee that images contain no sensitive information. Audit reports retain redacted values and stay outside the repository.
+
+The latest source CI passed. The repository remains private pending the fresh v0.4 browser acceptance above. The user has authorized public visibility after completion; changing visibility is still unperformed. This preflight does not establish production readiness or replace operator-side telemetry/privacy review.
+
 ## v0.3 · 2026-10-10
 
 Development base: `5394631f7905ccdc04904efbafb2656dd788bbd9`. Release source and fresh CI are bound to the commit shown by the [CI workflow](https://github.com/benny1020/signaldesk/actions/workflows/ci.yml). The v0.2 evidence below remains historical.
