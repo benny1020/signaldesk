@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useMemo } from 'react';
+import { lazy, Suspense, useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
@@ -20,15 +20,16 @@ import type { PageProps } from '../Pages';
 import { request, queryString } from '../api';
 import { Chart, Empty, number, time } from '../components';
 import { DependencyRules } from './DependencyRules';
-import { crossesRegion } from '../../../../packages/contracts/src/flow';
+import { regionLabel } from '../../../../packages/contracts/src/deployments';
 const Canvas = lazy(() => import('./FlowCanvas'));
 const Heatmap = lazy(() => import('./LatencyHeatmap'));
-const matchesView = (edge: FlowEdge, mode: string, source?: FlowNode, target?: FlowNode) =>
-  mode === 'all' ||
-  mode === edge.direction ||
-  (mode === 'failures' && edge.errors > 0) ||
-  (mode === 'cross-region' && crossesRegion(source, target));
+const matchesView = (edge: FlowEdge, mode: string) =>
+  mode === 'all' || mode === edge.direction || (mode === 'failures' && edge.errors > 0);
 export function RequestFlow(p: PageProps) {
+  useEffect(() => {
+    if (p.params.flowView === 'cross-region')
+      p.updateScope({ flowView: undefined, edge: undefined }, true);
+  }, [p.params.flowView, p.updateScope]);
   const params = { ...p.params, from: p.data.window.from, to: p.data.window.to };
   const query = useQuery({
     queryKey: ['request-flow', params],
@@ -39,8 +40,11 @@ export function RequestFlow(p: PageProps) {
   const [map, setMap] = useState(true),
     [search, setSearch] = useState(''),
     [focus, setFocus] = useState<FlowNode | null>(null),
-    [regionsExpanded, setRegionsExpanded] = useState(false);
-  const mode = String(p.params.flowView ?? 'all');
+    [regionsExpanded, setRegionsExpanded] = useState(true);
+  // Older saved cross-region-only views now open the ordinary regional flows.
+  const mode = ['inbound', 'outbound', 'failures'].includes(String(p.params.flowView))
+    ? String(p.params.flowView)
+    : 'all';
   const data = query.data;
   const edges = useMemo(
     () =>
@@ -53,7 +57,7 @@ export function RequestFlow(p: PageProps) {
           n?.module === focus?.module &&
           (focus?.region === 'all' || n?.region === focus?.region);
         return (
-          matchesView(e, mode, source, target) &&
+          matchesView(e, mode) &&
           (!focus || focused(source) || focused(target)) &&
           [source?.name, target?.name, source?.region, target?.region, e.route]
             .join(' ')
@@ -67,6 +71,10 @@ export function RequestFlow(p: PageProps) {
   const select = (e: FlowEdge) =>
     p.updateScope({ edge: e.id, from: String(p.data.window.from), to: String(p.data.window.to) });
   const node = (id?: string) => data?.nodes.find((n) => n.id === id);
+  const selectedSource = node(selected?.source),
+    selectedTarget = node(selected?.target),
+    observed = selectedSource?.type === 'workload' ? selectedSource : selectedTarget,
+    internal = selectedSource?.type === 'workload' && selectedTarget?.type === 'workload';
   const graph = useMemo(() => {
     if (!data || regionsExpanded) return { data, edges, selected };
     const groups = new Map<string, FlowNode[]>(),
@@ -115,7 +123,7 @@ export function RequestFlow(p: PageProps) {
           <Network size={24} />
           <div>
             <strong>고객 요청에서 외부 의존성까지</strong>
-            <p>우리 API의 응답과 하위 호출 결과를 연결해 봅니다.</p>
+            <p>리전별 내부 서비스와 외부 API 호출을 고객 응답에 연결해 봅니다.</p>
           </div>
         </div>
         <button className="text-button" onClick={() => p.navigate('metrics')}>
@@ -170,7 +178,6 @@ export function RequestFlow(p: PageProps) {
             ['all', '전체 흐름'],
             ['inbound', '진입 API'],
             ['outbound', '하위 호출'],
-            ['cross-region', '리전 간 호출'],
             ['failures', '실패 관측'],
           ].map(([key, title]) => (
             <button
@@ -179,9 +186,7 @@ export function RequestFlow(p: PageProps) {
               aria-pressed={mode === key}
               onClick={() => {
                 setFocus(null);
-                const next = data?.edges.find((e) =>
-                  matchesView(e, key, node(e.source), node(e.target)),
-                );
+                const next = data?.edges.find((e) => matchesView(e, key));
                 p.updateScope({ flowView: key === 'all' ? undefined : key, edge: next?.id });
               }}
             >
@@ -330,16 +335,19 @@ export function RequestFlow(p: PageProps) {
                       {selected.method} {selected.route}
                     </p>
                     <div className="flow-selected-place">
-                      {node(selected.source)?.region} → {node(selected.target)?.region}
+                      {internal && selectedSource?.region !== selectedTarget?.region ? (
+                        <>
+                          {selectedSource?.region} → {selectedTarget?.region}
+                        </>
+                      ) : (
+                        <>
+                          {regionLabel(observed?.region ?? 'unknown')}에서 관측 ·{' '}
+                          {internal ? '리전 내부 호출' : '상대 위치 미관측'}
+                        </>
+                      )}
                       <br />
-                      {node(selected.source)?.module} · {node(selected.source)?.environment}
+                      {observed?.module} · {observed?.environment}
                     </div>
-                    {crossesRegion(node(selected.source), node(selected.target)) && (
-                      <div className="flow-boundary">
-                        리전 간 내부 호출입니다. 호출 지연에는 네트워크 대기와 상대 서비스 처리가
-                        포함됩니다.
-                      </div>
-                    )}
                     <div className="flow-result">
                       <strong>{percent(selected.errors, selected.count)}</strong>
                       <span>관측 실패율 / {number(selected.count, 0)}건</span>

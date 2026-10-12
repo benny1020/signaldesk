@@ -16,27 +16,27 @@ Local mode is equivalent to a local operator and is never allowed on a non-loopb
 
 ## Endpoints
 
-| Method       | Path                        | Behavior / role                                                                                                                    |
-| ------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| GET          | `/health`                   | Unauthenticated process + database health                                                                                          |
-| GET          | `/api/bootstrap`            | Runtime mode, demo clock, capability flags / read                                                                                  |
-| GET          | `/api/dashboard`            | Bounded correlated service/host/chart/AI view / read                                                                               |
-| GET / PATCH  | `/api/resources[/:id]`      | Scoped inventory / explicit `{retired:boolean}` lifecycle, read / admin                                                            |
-| POST         | `/api/ingest`               | Atomic native events / ingest                                                                                                      |
-| POST         | `/api/v1/traces`            | Bounded OTLP HTTP JSON trace bridge / ingest                                                                                       |
-| GET          | `/api/logs`                 | Message `search`, `level`, `limit`, keyset `cursor` / read                                                                         |
-| GET          | `/api/spans`                | Paged spans / read                                                                                                                 |
-| GET          | `/api/traces/:traceId`      | Indexed exact trace, expands service/deployment filters to include cross-region children; honors workspace/environment/time / read |
-| GET          | `/api/export`               | JSON log page, max 10,000, truncation flag / read                                                                                  |
-| GET          | `/api/briefing`             | Deterministic evidence summary and hypotheses / read                                                                               |
-| POST         | `/api/rules/preview`        | Latest resource/region/service group threshold comparison / read                                                                   |
-| POST / PATCH | `/api/rules[/:id]`          | Create/update scoped rule / admin                                                                                                  |
-| PATCH        | `/api/alerts/:id`           | `acknowledged`, `snoozeMinutes` 0–1440 / admin                                                                                     |
-| POST / PATCH | `/api/incidents[/:id]`      | Create, status/owner/note changes / admin                                                                                          |
-| GET          | `/api/connections`          | Health, channel metadata, probes, last 100 deliveries/audit / read                                                                 |
-| POST / PATCH | `/api/channels[/:id]`       | Create HTTPS destination, toggle enabled; Live only / admin                                                                        |
-| POST / PATCH | `/api/probes[/:id]`         | Create HTTPS GET check, toggle enabled; Live only / admin                                                                          |
-| POST         | `/api/deliveries/:id/retry` | Reset failed delivery attempt budget / admin                                                                                       |
+| Method       | Path                        | Behavior / role                                                                                                                          |
+| ------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| GET          | `/health`                   | Unauthenticated process + database health                                                                                                |
+| GET          | `/api/bootstrap`            | Runtime mode, demo clock, capability flags / read                                                                                        |
+| GET          | `/api/dashboard`            | Bounded correlated service/host/chart/AI view / read                                                                                     |
+| GET / PATCH  | `/api/resources[/:id]`      | Scoped inventory / explicit `{retired:boolean}` lifecycle, read / admin                                                                  |
+| POST         | `/api/ingest`               | Atomic native events / ingest                                                                                                            |
+| POST         | `/api/v1/traces`            | Bounded OTLP HTTP JSON trace bridge / ingest                                                                                             |
+| GET          | `/api/logs`                 | Message `search`, `level`, `limit`, keyset `cursor` / read                                                                               |
+| GET          | `/api/spans`                | Paged spans / read                                                                                                                       |
+| GET          | `/api/traces/:traceId`      | Indexed exact trace, expands service/deployment filters to include correlated service children; honors workspace/environment/time / read |
+| GET          | `/api/export`               | JSON log page, max 10,000, truncation flag / read                                                                                        |
+| GET          | `/api/briefing`             | Deterministic evidence summary and hypotheses / read                                                                                     |
+| POST         | `/api/rules/preview`        | Latest resource/region/service group threshold comparison / read                                                                         |
+| POST / PATCH | `/api/rules[/:id]`          | Create/update scoped rule / admin                                                                                                        |
+| PATCH        | `/api/alerts/:id`           | `acknowledged`, `snoozeMinutes` 0–1440 / admin                                                                                           |
+| POST / PATCH | `/api/incidents[/:id]`      | Create, status/owner/note changes / admin                                                                                                |
+| GET          | `/api/connections`          | Health, channel metadata, probes, last 100 deliveries/audit / read                                                                       |
+| POST / PATCH | `/api/channels[/:id]`       | Create HTTPS destination, toggle enabled; Live only / admin                                                                              |
+| POST / PATCH | `/api/probes[/:id]`         | Create HTTPS GET check, toggle enabled; Live only / admin                                                                                |
+| POST         | `/api/deliveries/:id/retry` | Reset failed delivery attempt budget / admin                                                                                             |
 
 Lists return `{items,nextCursor,truncated}` for telemetry. Cursor order is timestamp and event ID descending. Treat cursors as opaque. HTTP 400 indicates invalid input, 401 missing/invalid token, 403 scope/role denial, 404 missing item, 429 rate limit and 507 storage/cardinality capacity, 503 operational database/worker availability errors. The API has a 1 MiB expanded request body limit (gzip supported) and a default 240 requests/minute per client IP. `/health` bypasses the application quota. Set `TRUSTED_PROXIES` to exact trusted ingress addresses; forwarded headers are ignored by default.
 

@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { SignalDeskClient } from '../packages/sdk/index.js';
 import { SignalDeskTracing } from '../packages/sdk/tracing.node.js';
 const endpoint = process.env.SIGNALDESK_URL ?? 'http://127.0.0.1:4319';
+const region = process.env.SIGNALDESK_REGION ?? 'ap-northeast-2';
 const clients = [],
   servers = [];
 async function listen(handler) {
@@ -53,7 +54,7 @@ try {
     res.writeHead(attempt % 4 === 1 ? 503 : 200);
     res.end('{}');
   });
-  const orders = tracing('example-flow-orders', 'us-east-1', [], true);
+  const orders = tracing('example-flow-orders', region, [], true);
   const ordersURL = await listen(
     instrument(orders, '/orders', async () => {
       let response;
@@ -75,7 +76,7 @@ try {
       return { status: response.ok ? 200 : 503, body: { ok: response.ok } };
     }),
   );
-  const gateway = tracing('example-flow-gateway', 'ap-northeast-2', [ordersURL]);
+  const gateway = tracing('example-flow-gateway', region, [ordersURL]);
   const gatewayURL = await listen(
     instrument(
       gateway,
@@ -113,6 +114,7 @@ try {
         providerAttempts: attempts,
         workspace: 'live',
         environment: 'example',
+        region,
         view: endpoint + '/?page=overview&workspace=live&environment=example&range=30',
       },
       null,

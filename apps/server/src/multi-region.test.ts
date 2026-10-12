@@ -10,13 +10,12 @@ import {
   regionalComparison,
   regionalSummary,
 } from '../../../packages/contracts/src/deployments.ts';
-import { crossesRegion } from '../../../packages/contracts/src/flow.ts';
 import type { ResourceSummary, Metric, Rule } from '../../../packages/contracts/src/index.ts';
 
 const now = Date.now();
 const scope = { workspace: 'demo' as const, from: now - 3600000, to: now };
 
-test('five-region demo keeps the same services on regional infrastructure and local calls by default', async () => {
+test('five-region demo keeps the same services on independent infrastructure with no inter-region calls', async () => {
   const store = new Store(':memory:');
   try {
     await seedDemo(store, now);
@@ -38,12 +37,25 @@ test('five-region demo keeps the same services on regional infrastructure and lo
         flow.nodes.find((n) => n.id === e.target)?.type === 'workload',
     );
     const node = (id: string) => flow.nodes.find((n) => n.id === id);
-    const cross = internal.filter((e) => crossesRegion(node(e.source), node(e.target)));
-    assert.ok(cross.length > 0, 'explicit cross-region examples remain investigable');
-    assert.ok(
-      internal.filter((e) => !cross.includes(e)).reduce((n, e) => n + e.count, 0) >
-        cross.reduce((n, e) => n + e.count, 0),
-    );
+    assert.ok(internal.length > 0, 'same-region internal calls remain investigable');
+    for (const edge of internal) {
+      assert.equal(node(edge.source)?.region, node(edge.target)?.region);
+      assert.ok(exampleRegions.some((r) => r.id === node(edge.source)?.region));
+    }
+    // Check every seeded span and log, including the older non-HTTP waterfall fixtures.
+    const traces = new Map<string, Set<string>>();
+    for (const kind of ['span', 'log'] as const) {
+      const events = store.query(kind, { ...scope, limit: 10000 });
+      assert.equal(events.nextCursor, null);
+      for (const event of events.items) {
+        if (event.kind === 'metric' || !event.traceId) continue;
+        const regions = traces.get(event.traceId) ?? new Set<string>();
+        regions.add(event.region!);
+        traces.set(event.traceId, regions);
+      }
+    }
+    assert.ok(traces.size >= 380);
+    for (const regions of traces.values()) assert.equal(regions.size, 1);
     assert.deepEqual(
       [...new Set(flow.nodes.filter((n) => n.type === 'workload').map((n) => n.region))].sort(),
       grid.regions,
@@ -253,21 +265,6 @@ test('same-shaped five regional deployments evaluate failures and recovery indep
   } finally {
     store.close();
   }
-});
-
-test('external, missing and grouped region identities are not classified as cross-region internal calls', () => {
-  const source = {
-    name: 'orders',
-    type: 'workload' as const,
-    environment: 'production',
-    region: 'seoul',
-    module: 'api',
-  };
-  assert.equal(crossesRegion(source, { ...source, region: 'japan' }), true);
-  assert.equal(crossesRegion(source, { ...source, region: 'seoul' }), false);
-  assert.equal(crossesRegion(source, { ...source, region: 'unknown' }), false);
-  assert.equal(crossesRegion(source, { ...source, region: 'all' }), false);
-  assert.equal(crossesRegion(source, { ...source, type: 'dependency', region: 'japan' }), false);
 });
 
 test('large regional inventories disclose a bounded comparison instead of creating an unbounded matrix', () => {

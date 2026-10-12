@@ -1273,7 +1273,7 @@ export function ConnectionsPage(p: PageProps) {
         <Panel title="서비스 연결" meta="JSON 수집 API · OTLP HTTP JSON 트레이스">
           <p className="panel-copy">
             서비스·환경·리전·모듈·인스턴스를 포함해 데이터를 전송하세요. 배포 단위별 오류를 구분하고
-            같은 요청의 트레이스는 리전 간에도 연결합니다.
+            같은 리전 안의 내부 서비스와 외부 API 호출을 같은 요청의 트레이스로 연결합니다.
           </p>
           <pre className="code-block">{`POST /api/ingest\n{ "workspace": "live", "events": [{\n  "kind": "metric", "name": "error_pct",\n  "value": 0.2, "service": "orders-api",\n  "environment": "production",\n  "region": "ap-northeast-2", "module": "api",\n  "instanceId": "orders-pod-1",\n  "timestamp": ${Date.now()}\n}] }`}</pre>
           <small className="muted">

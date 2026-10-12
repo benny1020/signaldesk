@@ -8,7 +8,7 @@ SignalDesk connects server and API telemetry to the operational decisions made d
 2. Ingest real telemetry → threshold rule pending/firing → acknowledge or snooze → notification delivery history → metric recovers → resolved alert.
 3. Incident → inspect evidence → assign owner, change status, add timeline note → persisted audit history.
 4. AI workload → latency, token usage, reported cost and score provenance → original trace. Missing cost and evaluations remain unknown.
-5. Region comparison → module/instance → scoped logs → cross-region exact trace, keeping filters in URL. Explicitly retire drained resources without deleting history.
+5. Region comparison → module/instance → scoped logs → same-region request trace across internal services and external dependencies, keeping filters in URL. Explicitly retire drained resources without deleting history.
 6. Fresh installation → demo clearly identified → switch to live → real local host/API data → integration instructions for external services.
 
 ## Information architecture
@@ -39,7 +39,7 @@ Review against brief: use a light reading canvas and muted navy navigation for l
 
 ## Multi-deployment visual semantics
 
-The shared deployment bar keeps region visible and collapses module/cluster/namespace/zone/instance until needed. Facets respect other active selectors. Regional rows align request rate, weighted errors, worst-instance p95 and stale-resource counts; the inventory identifies equal Pod names by full tuple. Resource drilldown preserves all dimensions. Exact trace opens the whole request across regions, while logs remain scoped. Missing identities are labelled unknown. Worker health shows each platform process separately from application instances.
+The shared deployment bar keeps region visible and collapses module/cluster/namespace/zone/instance until needed. Facets respect other active selectors. Regional rows align request rate, weighted errors, worst-instance p95 and stale-resource counts; the inventory identifies equal Pod names by full tuple. Resource drilldown preserves all dimensions. Exact trace opens all participating services and modules in the request, while logs remain scoped. Missing identities are labelled unknown. Worker health shows each platform process separately from application instances.
 
 ## v0.3 investigation contracts
 

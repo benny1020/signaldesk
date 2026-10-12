@@ -21,6 +21,8 @@ Six pinned GitHub repositories and read-file hashes are recorded in [source mani
 
 ## Responsibility and call flow
 
+Current operating premise (clarified 2026-10-13): the same application runs independently in five regions. A business request calls internal services only in its own region, then external dependencies. Regional telemetry supports central comparison. The previous artificial cross-region application examples and UI filter have been removed; multi-region parser regression fixtures remain historical/defensive correctness cases, not the product topology.
+
 Application OTel SERVER + CLIENT instrumentation → regional Collector (resource identity, redaction, batching, persistent queue) → TelemetryStore → SQL deduplication/pairing/nearest and entry SERVER ancestry → request-flow API → shared time/resource context → topology, latency distribution, customer-impact evidence → existing trace/log/alert/incident workflows.
 
 Incoming spans count observed API requests. Outgoing spans count observed attempts. A matched receiver does not add a second edge count. Source-side latency includes transport/client wait and differs from receiver duration. An external node's success describes our call, not that provider's complete availability. CLIENT 4xx is a dependency failure by default; SERVER 4xx remains separate from server errors. 429, timeout and resend are visible separately.

@@ -180,7 +180,7 @@ export function Detail({
                 <div className="notice">일부 스팬만 표시됩니다. 시간 범위를 좁히세요.</div>
               )}
               <p className="muted">
-                트레이스는 현재 환경·시간 내 연결된 다른 리전과 모듈의 스팬을 함께 표시합니다.
+                트레이스는 현재 환경·시간 내 요청에 연결된 서비스와 모듈의 스팬을 함께 표시합니다.
               </p>
               <TraceWaterfall
                 spans={trace.data.items}

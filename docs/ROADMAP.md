@@ -24,7 +24,7 @@ Use [verification](VERIFICATION.md), [operations](OPERATIONS.md) and [regional d
 
 ## v0.4 remaining gates
 
-Five-region follow-through: same-service/environment/module region comparison, scoped deployment drilldown, cross-region internal call filtering and local-by-default five-location Demo are implemented. Artifact/release/config drift inventory, expected-region onboarding, regional Collector queue telemetry, provider incident correlation and actual geographic acceptance remain future work. See [operating model](FIVE_REGION_OPERATIONS.md).
+Five-region follow-through: same-service/environment/module region comparison, geographic overview, scoped deployment drilldown and a five-location Demo with all internal calls contained within each region are implemented. The previous cross-region-call example/filter was removed after the regional independence premise was clarified. Artifact/release/config drift inventory, expected-region onboarding, regional Collector queue telemetry, provider incident correlation and actual geographic acceptance remain future work. See [operating model](FIVE_REGION_OPERATIONS.md).
 
 Implemented: explicit boundary spans, request map, route heatmap, pairing/dedup, customer-response correlation, observed dependency rules, local executable HTTP example and SQLite/PostgreSQL parity. Fresh desktop/mobile map/heatmap/keyboard/drilldown checks are recorded in VERIFICATION.md. Remaining acceptance: real-service instrumentation and propagation across queues/async libraries; high-cardinality/concurrent SQL plans; pre-sampling RED metric adapters; production timeout/retry/circuit-breaker failure drills; geographic HA and exporter coverage.
 

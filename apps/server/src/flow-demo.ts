@@ -9,8 +9,6 @@ export async function seedRequestFlowDemo(store: Storage, now: number) {
   for (let i = 0; i < 150; i++) {
     const timestamp = now - (149 - i) * 20000,
       region = regions[i % regions.length],
-      // Regional infrastructure is independent. Only explicit examples cross its boundary.
-      paymentRegion = i % 15 === 0 ? regions[(i + 1) % regions.length] : region,
       outage = i > 112 && region === 'ap-northeast-2',
       recover = outage && i % 2 === 1;
     const traceId = 'flow-demo-' + i.toString().padStart(4, '0'),
@@ -24,7 +22,6 @@ export async function seedRequestFlowDemo(store: Storage, now: number) {
       parentSpanId: string | undefined,
       attrs: Span['attributes'],
       failed = false,
-      peerRegion = region,
     ) =>
       events.push({
         kind: 'span',
@@ -36,15 +33,15 @@ export async function seedRequestFlowDemo(store: Storage, now: number) {
         timestamp: start,
         service,
         environment: 'production',
-        region: peerRegion,
+        region,
         module:
           service === 'payment-worker'
             ? 'payments'
             : service === 'api-gateway'
               ? 'edge'
               : 'checkout',
-        zone: peerRegion + (i % 2 === 0 ? 'a' : 'b'),
-        cluster: 'prod-' + peerRegion,
+        zone: region + (i % 2 === 0 ? 'a' : 'b'),
+        cluster: 'prod-' + region,
         namespace: 'commerce',
         instanceId: service + '-' + ((i % 2) + 1),
         name:
@@ -129,7 +126,6 @@ export async function seedRequestFlowDemo(store: Storage, now: number) {
         'http.response.status_code': outage && !recover ? 502 : 200,
       },
       outage && !recover,
-      paymentRegion,
     );
     emit(
       'bank-client',
@@ -148,7 +144,6 @@ export async function seedRequestFlowDemo(store: Storage, now: number) {
         'http.request.resend_count': 0,
       },
       outage,
-      paymentRegion,
     );
     if (recover)
       emit(
@@ -166,7 +161,6 @@ export async function seedRequestFlowDemo(store: Storage, now: number) {
           'http.request.resend_count': 1,
         },
         false,
-        paymentRegion,
       );
     emit('stock-client', 'checkout-api', 'client', timestamp + 32, 60 + (i % 5) * 9, 'checkout', {
       'server.address': 'inventory.example.test',
@@ -181,10 +175,10 @@ export async function seedRequestFlowDemo(store: Storage, now: number) {
         timestamp: timestamp + 50,
         service: 'payment-worker',
         environment: 'production',
-        region: paymentRegion,
+        region,
         module: 'payments',
-        zone: paymentRegion + (i % 2 === 0 ? 'a' : 'b'),
-        cluster: 'prod-' + paymentRegion,
+        zone: region + (i % 2 === 0 ? 'a' : 'b'),
+        cluster: 'prod-' + region,
         namespace: 'commerce',
         instanceId: 'payment-worker-' + ((i % 2) + 1),
         level: 'error',

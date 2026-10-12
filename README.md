@@ -53,11 +53,9 @@ SignalDesk is a self-hosted monitoring and incident workspace for engineers who 
 
 The primary map uses **React Flow 12.12 + ELK 0.12** with layout in a lazy Web Worker, a disclosed graph cap and equivalent numeric connections. Selected connections show an **ECharts latency distribution heatmap** with real bin counts and empty gaps. Charts use modular **Apache ECharts 6.1**, with shared investigation range selection, missing-data gaps, series toggles, explicit units, CSV and numeric table alternatives. Absolute UTC bounds, KST/UTC display, saved views and detail URL restoration carry the investigation context. Logs use **TanStack Virtual** and paged server queries. React Query coordinates polling and invalidation. Reduced motion, native modal focus handling and small-screen layouts are included.
 
-![v0.4 request map and correlated API outcomes](docs/screenshots/v04/request-map.jpg)
+![Region-contained request flow and correlated API outcomes · Demo](docs/screenshots/v04/region-local-flow.jpg)
 
-![v0.4 latency distribution and trends](docs/screenshots/v04/latency.jpg)
-
-![v0.4 cross-region trace and recovered timeout](docs/screenshots/v04/trace.jpg)
+![Same-region trace with a failed provider attempt and successful retry · Demo](docs/screenshots/v04/regional-trace.jpg)
 
 <details>
 <summary>Historical v0.3 / v0.2 screens</summary>
@@ -211,7 +209,7 @@ Historical v0.3 manual browser acceptance covers the correlated navigation, aler
 
 The [v0.4 research and design](docs/REQUEST_FLOW_REDESIGN.md) compares OTel, Google Dapper, Uber/Jaeger, AWS, Azure, Tempo and SigNoz using official material and six pinned GitHub source snapshots. Research patterns are implemented in original code; no upstream product assets/code were copied. Current-source research does not assert production feature parity.
 
-The same application can be compared across independent European, North American, Japanese, Singaporean and Seoul deployments. A geographic overview pairs an offline world map with an Asian inset so nearby regions stay readable. Select a region to inspect its observed status and metrics, then open regional deployments, logs or request flows with the investigation scope preserved. Location markers use representative points, not facility locations; unregistered region codes stay in the equivalent selectable list. The new Demo uses five locations, local internal calls by default and explicit cross-region examples. Compare service/environment/module rows, open a regional deployment and investigate cross-region calls. [The five-region operating model](docs/FIVE_REGION_OPERATIONS.md) separates implemented behavior from release/digest drift inventory and real geographic resilience work.
+The same application can be compared across independent European, North American, Japanese, Singaporean and Seoul deployments. Application services call internal services within their own region and then external dependencies; there are no inter-region application calls in this operating model. Regional telemetry feeds the central comparison workspace. A geographic overview pairs an offline world map with an Asian inset so nearby regions stay readable. Select a region to inspect its observed status and metrics, then open regional deployments, logs or request flows with the investigation scope preserved. Location markers use representative points, not facility locations; unregistered region codes stay in the equivalent selectable list. The new Demo keeps every trace's application spans/logs in one region. Compare service/environment/module rows and investigate each region's internal/external calls. [The five-region operating model](docs/FIVE_REGION_OPERATIONS.md) separates implemented behavior from release/digest drift inventory and real geographic resilience work.
 
 ![Geographic region overview with an Asian inset · Demo](docs/screenshots/v04/region-atlas.jpg)
 

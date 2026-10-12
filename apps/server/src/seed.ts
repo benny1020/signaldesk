@@ -214,12 +214,7 @@ export async function seedDemo(store: Storage, now = Date.now()) {
     else {
       const index = Number(e.traceId?.match(/\d+$/)?.[0] ?? 0),
         sourceRegion = Math.floor(index / 6) % regions.length,
-        region =
-          regions[
-            e.kind === 'span' && e.name === 'payment.authorize' && index % 30 === 0
-              ? (sourceRegion + 1) % regions.length
-              : sourceRegion
-          ],
+        region = regions[sourceRegion],
         replica = Math.floor(index / 18) % 2;
       expanded.push({ ...e, ...resource(e.service, region, replica) });
     }
