@@ -18,7 +18,10 @@
     "format": "prettier --write . --ignore-unknown",
     "format:check": "prettier --check . --ignore-unknown",
     "test:postgres": "tsx --test apps/server/src/postgres.integration.ts",
-    "test:distributed": "node scripts/postgres-smoke.mjs signaldesk:local"
+    "test:distributed": "node scripts/postgres-smoke.mjs signaldesk:local",
+    "setup": "tsx scripts/setup.ts",
+    "doctor": "node --env-file-if-exists=.env --import tsx scripts/doctor.ts",
+    "benchmark": "tsx scripts/benchmark.ts"
   },
   "dependencies": {
     "@fastify/compress": "9.2.1",

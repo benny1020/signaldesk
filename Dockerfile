@@ -13,6 +13,7 @@ RUN npm ci --omit=dev && mkdir /app/data && chown node:node /app/data
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/apps/server ./apps/server
 COPY --from=build /app/packages ./packages
+COPY --from=build /app/scripts ./scripts
 USER node
 EXPOSE 4319
 VOLUME ["/app/data"]

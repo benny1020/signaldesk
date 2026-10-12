@@ -45,7 +45,7 @@ export function ServiceLevels(p: PageProps) {
             검증하세요.
           </p>
         </div>
-        <button className="button" onClick={() => edit()}>
+        <button className="button" disabled={!p.canWrite} onClick={() => edit()}>
           <Plus size={15} />
           SLO 정의
         </button>
@@ -69,7 +69,11 @@ export function ServiceLevels(p: PageProps) {
               {q.data?.items.map((r) => (
                 <tr key={r.definition.id}>
                   <td>
-                    <button className="text-button" onClick={() => edit(r.definition)}>
+                    <button
+                      className="text-button"
+                      disabled={!p.canWrite}
+                      onClick={() => edit(r.definition)}
+                    >
                       {r.definition.name}
                     </button>
                     <small className="cell-detail">
@@ -120,7 +124,7 @@ export function ServiceLevels(p: PageProps) {
                 <span>
                   {d.service} · v{d.revision}
                 </span>
-                <button className="text-button" onClick={() => edit(d)}>
+                <button className="text-button" disabled={!p.canWrite} onClick={() => edit(d)}>
                   편집 / 다시 켜기
                 </button>
               </div>
@@ -236,7 +240,7 @@ export function ServiceLevels(p: PageProps) {
               <button
                 type="button"
                 className="button secondary"
-                disabled={busy}
+                disabled={!p.canWrite || busy}
                 onClick={async () => {
                   setBusy(true);
                   const ok = await p.mutate(
@@ -251,7 +255,7 @@ export function ServiceLevels(p: PageProps) {
                 목표 중지 · 활성 경보 해결
               </button>
             )}
-            <button className="button" disabled={busy}>
+            <button className="button" disabled={!p.canWrite || busy}>
               정의 저장
             </button>
           </form>

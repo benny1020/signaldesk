@@ -66,13 +66,33 @@ export function flowSQL(kind: AggregateKind, scope: QueryScope, postgres: boolea
     `(${alias}.status='error' OR ${alias}.status_code>=500 OR (${alias}.span_kind='client' AND ${alias}.status_code>=400))`;
   const keyCols = flowKeys.join(',');
   // If erroneous telemetry contains two receivers, choose deterministically rather than multiply CLIENT attempts.
-  const receiver = `LEFT JOIN receivers receiver ON receiver.trace_id=c.trace_id AND receiver.environment=c.environment AND receiver.parent_id=c.span_id`;
+  const receiver = `LEFT JOIN receivers receiver ON receiver.trace_id=c.trace_id AND receiver.environment=c.environment AND receiver.parent_id=c.span_id AND receiver.receiver_rank=1`;
+  const clientKeys: Record<(typeof flowKeys)[number], string> = {
+    s_type: "'workload'",
+    s_name: 'c.service',
+    s_env: 'c.environment',
+    s_region: 'c.region',
+    s_module: 'c.module',
+    t_type: "CASE WHEN receiver.span_id IS NOT NULL THEN 'workload' ELSE 'dependency' END",
+    t_name: 'coalesce(receiver.service,c.peer)',
+    t_env: "coalesce(receiver.environment,'unknown')",
+    t_region: "coalesce(receiver.region,'unobserved')",
+    t_module: "coalesce(receiver.module,'unknown')",
+    route: 'c.route',
+    method: 'c.method',
+    protocol: 'c.protocol',
+  };
+  const clientFilter = scope.flowFilter
+    ? ' AND ' +
+      flowKeys.map((key, i) => `${clientKeys[key]}=${p(scope.flowFilter![i])}`).join(' AND ')
+    : '';
   // PostgreSQL may inline rank CTEs and repeat them per CLIENT under selective filters.
   // Materialize SERVER candidates and ancestry ranks once; preserve the 15s statement budget.
   const cte = `WITH RECURSIVE raw AS (${raw}),s AS (SELECT * FROM raw WHERE duplicate_rank=1),servers AS ${postgres ? 'MATERIALIZED ' : ''}(SELECT * FROM s WHERE span_kind='server'),selected AS (SELECT * FROM s WHERE ${selectedConditions.join(' AND ')}),
-    receivers AS (SELECT * FROM (SELECT servers.*,row_number() OVER(PARTITION BY trace_id,environment,parent_id ORDER BY time,span_id) AS receiver_rank FROM servers WHERE parent_id<>'') x WHERE receiver_rank=1),
+    receivers AS MATERIALIZED (SELECT trace_id,environment,parent_id,span_id,service,region,module,row_number() OVER(PARTITION BY trace_id,environment,parent_id ORDER BY time,span_id) AS receiver_rank FROM servers WHERE parent_id<>''),
+    clients AS MATERIALIZED (SELECT c.* FROM s c ${receiver} LEFT JOIN selected chosen ON chosen.trace_id=c.trace_id AND chosen.environment=c.environment AND chosen.span_id=c.span_id LEFT JOIN selected chosen_receiver ON chosen_receiver.trace_id=receiver.trace_id AND chosen_receiver.environment=receiver.environment AND chosen_receiver.span_id=receiver.span_id WHERE c.span_kind='client' AND c.time>=${p(scope.from)} AND c.time<=${p(scope.to)} AND (chosen.span_id IS NOT NULL OR chosen_receiver.span_id IS NOT NULL)${clientFilter}),
     walk(trace_id,environment,origin_id,parent_id,depth) AS (
-      SELECT trace_id,environment,span_id,parent_id,0 FROM s WHERE span_kind='client' AND time>=${p(scope.from)} AND time<=${p(scope.to)}
+      SELECT trace_id,environment,span_id,parent_id,0 FROM clients
       UNION ALL SELECT w.trace_id,w.environment,w.origin_id,p.parent_id,w.depth+1 FROM walk w JOIN s p ON p.trace_id=w.trace_id AND p.environment=w.environment AND p.span_id=w.parent_id WHERE w.depth<15 AND p.parent_id<>''),
     parents AS ${postgres ? 'MATERIALIZED ' : ''}(SELECT trace_id,environment,origin_id,parent_id FROM (SELECT w.*,row_number() OVER(PARTITION BY w.trace_id,w.environment,w.origin_id ORDER BY depth) AS rank FROM walk w JOIN servers p ON p.trace_id=w.trace_id AND p.environment=w.environment AND p.span_id=w.parent_id WHERE p.span_kind='server') ranked WHERE rank=1),
     entries AS ${postgres ? 'MATERIALIZED ' : ''}(SELECT trace_id,environment,origin_id,parent_id FROM (SELECT w.*,row_number() OVER(PARTITION BY w.trace_id,w.environment,w.origin_id ORDER BY p.is_entry DESC,depth DESC) AS rank FROM walk w JOIN servers p ON p.trace_id=w.trace_id AND p.environment=w.environment AND p.span_id=w.parent_id WHERE p.span_kind='server' AND (p.parent_id='' OR p.is_entry=1)) ranked WHERE rank=1),
@@ -81,7 +101,7 @@ export function flowSQL(kind: AggregateKind, scope: QueryScope, postgres: boolea
       c.route,c.method,c.protocol,'outbound' AS direction,c.trace_id,c.span_id,c.service,c.environment,c.region,c.module,c.instanceId,c.time,c.duration,CASE WHEN ${bad('c')} THEN 1 ELSE 0 END AS failed,c.status_code,c.error_type,c.resend,
       CASE WHEN receiver.span_id IS NOT NULL THEN 1 ELSE 0 END AS paired,p.span_id AS parent_span,p.duration AS parent_duration,p.route AS parent_route,
       CASE WHEN p.span_id IS NULL THEN NULL WHEN ${bad('p')} THEN 1 ELSE 0 END AS parent_failed,r.span_id AS entry_span,r.duration AS entry_duration,r.route AS entry_route,r.service AS entry_service,CASE WHEN r.span_id IS NULL THEN NULL WHEN ${bad('r')} THEN 1 ELSE 0 END AS entry_failed
-      FROM s c ${receiver} LEFT JOIN selected chosen ON chosen.trace_id=c.trace_id AND chosen.environment=c.environment AND chosen.span_id=c.span_id LEFT JOIN selected chosen_receiver ON chosen_receiver.trace_id=receiver.trace_id AND chosen_receiver.environment=receiver.environment AND chosen_receiver.span_id=receiver.span_id LEFT JOIN parents ap ON ap.trace_id=c.trace_id AND ap.environment=c.environment AND ap.origin_id=c.span_id LEFT JOIN servers p ON p.trace_id=c.trace_id AND p.environment=c.environment AND p.span_id=ap.parent_id LEFT JOIN entries er ON er.trace_id=c.trace_id AND er.environment=c.environment AND er.origin_id=c.span_id LEFT JOIN servers r ON r.trace_id=c.trace_id AND r.environment=c.environment AND r.span_id=er.parent_id WHERE c.span_kind='client' AND c.time>=${p(scope.from)} AND c.time<=${p(scope.to)} AND (chosen.span_id IS NOT NULL OR chosen_receiver.span_id IS NOT NULL)),
+      FROM clients c ${receiver} LEFT JOIN parents ap ON ap.trace_id=c.trace_id AND ap.environment=c.environment AND ap.origin_id=c.span_id LEFT JOIN servers p ON p.trace_id=c.trace_id AND p.environment=c.environment AND p.span_id=ap.parent_id LEFT JOIN entries er ON er.trace_id=c.trace_id AND er.environment=c.environment AND er.origin_id=c.span_id LEFT JOIN servers r ON r.trace_id=c.trace_id AND r.environment=c.environment AND r.span_id=er.parent_id),
     incoming AS (SELECT CASE WHEN parent.span_id IS NULL THEN 'caller' ELSE 'workload' END AS s_type,coalesce(parent.service,c.caller) AS s_name,coalesce(parent.environment,'unknown') AS s_env,coalesce(parent.region,'unobserved') AS s_region,coalesce(parent.module,'unknown') AS s_module,
       'workload' AS t_type,c.service AS t_name,c.environment AS t_env,c.region AS t_region,c.module AS t_module,
       c.route,c.method,c.protocol,'inbound' AS direction,c.trace_id,c.span_id,c.service,c.environment,c.region,c.module,c.instanceId,c.time,c.duration,CASE WHEN ${bad('c')} THEN 1 ELSE 0 END AS failed,c.status_code,c.error_type,c.resend,0 AS paired,

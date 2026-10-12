@@ -30,6 +30,7 @@ import {
   Command,
   ArrowUpRight,
   RefreshCw,
+  LogOut,
 } from 'lucide-react';
 import type {
   Dashboard,
@@ -59,6 +60,8 @@ import { CreateForm } from './Forms';
 import { Detail } from './Detail';
 import { request, queryString } from './api';
 import { RequestFlow } from './flow/RequestFlow';
+import { AccessGate } from './AccessGate';
+import type { Session } from '../../../packages/contracts/src/session';
 import './flow/style.css';
 const navigation = [
   {
@@ -248,7 +251,7 @@ export default function App() {
     [toast, setToast] = useState(''),
     [searchOpen, setSearchOpen] = useState(false),
     [search, setSearch] = useState(''),
-    [loginToken, setLoginToken] = useState(''),
+    [authRevision, setAuthRevision] = useState(0),
     [timeOpen, setTimeOpen] = useState(false),
     [fromInput, setFromInput] = useState(''),
     [toInput, setToInput] = useState(''),
@@ -295,6 +298,27 @@ export default function App() {
     }),
     [workspace, env, service, range, url.toString()],
   );
+  const session = useQuery({
+    queryKey: ['session', authRevision],
+    queryFn: ({ signal }) => request<Session>('/api/session', { signal }),
+    retry: false,
+  });
+  const canWrite = session.data?.canWrite === true;
+  const workspaceAllowed = session.data?.workspaces.includes(workspace) === true;
+  useEffect(() => {
+    if (session.data && (!session.data.workspaces.includes(workspace) || !url.has('workspace')))
+      update(
+        {
+          workspace: session.data.defaultWorkspace,
+          service: undefined,
+          environment: undefined,
+          ...Object.fromEntries(dimensionKeys.map((key) => [key, undefined])),
+          from: undefined,
+          to: undefined,
+        },
+        true,
+      );
+  }, [session.data, workspace, url.toString()]);
   const bootstrap = useQuery({
     queryKey: ['bootstrap', workspace],
     queryFn: () =>
@@ -305,24 +329,29 @@ export default function App() {
         diagnosisDestination?: string | null;
       }>('/api/bootstrap?workspace=' + workspace),
     retry: false,
+    enabled: session.isSuccess && workspaceAllowed,
   });
   const dashboard = useQuery({
     queryKey: ['dashboard', params],
     queryFn: ({ signal }) =>
       request<Dashboard>('/api/dashboard?' + queryString(params), { signal }),
-    enabled: bootstrap.isSuccess,
+    enabled: bootstrap.isSuccess && workspaceAllowed,
     refetchInterval: paused ? false : 5000,
   });
   const inventory = useQuery({
     queryKey: ['inventory', workspace],
     queryFn: () =>
       request<Page<ResourceSummary>>('/api/resources?' + queryString({ workspace, limit: 10000 })),
-    enabled: bootstrap.isSuccess,
+    enabled: bootstrap.isSuccess && workspaceAllowed,
     refetchInterval: paused ? false : 10000,
   });
   const selectedLog = useQuery({
     queryKey: ['selected-log', url.get('detailId'), params],
-    enabled: bootstrap.isSuccess && url.get('detail') === 'log' && !!url.get('detailId'),
+    enabled:
+      bootstrap.isSuccess &&
+      workspaceAllowed &&
+      url.get('detail') === 'log' &&
+      !!url.get('detailId'),
     queryFn: () =>
       request<Log>(
         '/api/events/log/' +
@@ -431,6 +460,10 @@ export default function App() {
     return () => clearTimeout(t);
   }, [toast]);
   async function mutate(path: string, body: unknown, method = 'POST') {
+    if (!canWrite) {
+      setToast('변경하려면 관리자 토큰으로 연결하세요.');
+      return null;
+    }
     try {
       const result = await request(path + '?workspace=' + workspace, {
         method,
@@ -465,7 +498,9 @@ export default function App() {
           setSelection(null);
         },
         mutate,
-        openForm: (kind, alert) => setForm({ kind, alert }),
+        openForm: (kind, alert) =>
+          canWrite ? setForm({ kind, alert }) : setToast('변경하려면 관리자 토큰으로 연결하세요.'),
+        canWrite,
         paused,
         updateScope: update,
         onRange: (from, to) => update({ from: String(from), to: String(to) }),
@@ -474,41 +509,32 @@ export default function App() {
     : undefined;
   const errors = (bootstrap.error ?? dashboard.error ?? selectedLog.error) as
     (Error & { status?: number }) | null;
-  if (errors?.status === 401)
+  async function changeToken(value: string) {
+    await client.cancelQueries();
+    client.clear();
+    if (value) sessionStorage.setItem('signaldesk-token', value);
+    else sessionStorage.removeItem('signaldesk-token');
+    setSelection(null);
+    setForm(null);
+    setSearchOpen(false);
+    setToast('');
+    setAuthRevision((revision) => revision + 1);
+  }
+  if (session.isPending || session.isError || errors?.status === 401)
     return (
-      <div className="login">
-        <div className="login-brand">SignalDesk</div>
-        <form
-          className="form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            sessionStorage.setItem('signaldesk-token', loginToken);
-            void client.resetQueries();
-          }}
-        >
-          <h1>워크스페이스에 연결</h1>
-          <p>운영자가 발급한 접근 토큰을 입력하세요.</p>
-          <label>
-            접근 토큰
-            <input
-              autoFocus
-              required
-              type="password"
-              value={loginToken}
-              onChange={(e) => setLoginToken(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
-          <button className="button">연결</button>
-        </form>
-      </div>
+      <AccessGate
+        error={session.error ?? (errors?.status === 401 ? errors : null)}
+        busy={session.isFetching}
+        connect={(value) => void changeToken(value)}
+        retry={() => void session.refetch()}
+      />
     );
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <a
           className="brand"
-          href="?page=overview&workspace=demo"
+          href={'?page=overview&workspace=' + workspace}
           onClick={(e) => {
             e.preventDefault();
             navigate('overview');
@@ -545,8 +571,12 @@ export default function App() {
                 setSelection(null);
               }}
             >
-              <option value="demo">Demo / 예제 데이터</option>
-              <option value="live">Live / 실제 수집</option>
+              {session.data?.workspaces.includes('demo') && (
+                <option value="demo">Demo / 예제 데이터</option>
+              )}
+              {session.data?.workspaces.includes('live') && (
+                <option value="live">Live / 실제 수집</option>
+              )}
             </select>
           </div>
         </div>
@@ -597,9 +627,17 @@ export default function App() {
           <div>
             <span className="operator-avatar">OP</span>
             <span>
-              Operations workspace<small>v0.4.0</small>
+              {session.data?.actor}
+              <small>
+                {canWrite ? '관리자' : '조회 전용'} · v{session.data?.version}
+              </small>
             </span>
           </div>
+          {session.data?.mode === 'token' && (
+            <button className="sidebar-search" onClick={() => void changeToken('')}>
+              <LogOut size={15} /> 연결 해제
+            </button>
+          )}
         </div>
       </aside>
       <div className="work-area">
@@ -608,7 +646,9 @@ export default function App() {
             <button
               aria-label="워크스페이스 전환"
               className={'workspace-pill ' + workspace}
+              disabled={session.data?.workspaces.length !== 2}
               onClick={() => {
+                if (session.data?.workspaces.length !== 2) return;
                 update({
                   workspace: workspace === 'demo' ? 'live' : 'demo',
                   service: undefined,
@@ -692,6 +732,16 @@ export default function App() {
             >
               <RefreshCw size={15} className={dashboard.isFetching ? 'spin' : ''} />
             </button>
+            {session.data?.mode === 'token' && (
+              <button
+                className="icon-button mobile-disconnect"
+                aria-label="연결 해제"
+                title={`${session.data.actor} · ${canWrite ? '관리자' : '조회 전용'} 연결 해제`}
+                onClick={() => void changeToken('')}
+              >
+                <LogOut size={15} />
+              </button>
+            )}
           </div>
         </header>
         <ResourceScope
@@ -722,7 +772,7 @@ export default function App() {
               {page === 'alerts' && (
                 <button
                   className="button"
-                  disabled={!props}
+                  disabled={!props || !canWrite}
                   onClick={() => setForm({ kind: 'rule' })}
                 >
                   <Plus size={15} /> 규칙 만들기
@@ -730,6 +780,11 @@ export default function App() {
               )}
             </div>
           </div>
+          {!canWrite && (
+            <div className="access-readonly" role="status">
+              조회 전용으로 연결했습니다. 규칙·장애·설정 변경에는 관리자 권한이 필요합니다.
+            </div>
+          )}
           {workspace === 'demo' && (
             <div className="demo-note">
               <span>
@@ -759,13 +814,7 @@ export default function App() {
               <button className="button secondary" onClick={() => void client.resetQueries()}>
                 다시 연결
               </button>
-              <button
-                className="text-button"
-                onClick={() => {
-                  sessionStorage.removeItem('signaldesk-token');
-                  void client.resetQueries();
-                }}
-              >
+              <button className="text-button" onClick={() => void changeToken('')}>
                 토큰 초기화
               </button>
             </div>
@@ -882,7 +931,7 @@ export default function App() {
           {toast}
         </div>
       )}
-      {form && props && (
+      {form && props && canWrite && (
         <CreateForm
           {...form}
           data={props.data}

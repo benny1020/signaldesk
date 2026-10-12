@@ -73,6 +73,7 @@ export function Catalog(p: PageProps) {
         </div>
         <button
           className="button secondary"
+          disabled={!p.canWrite}
           onClick={() => {
             setEditing(null);
             setName('');
@@ -82,7 +83,7 @@ export function Catalog(p: PageProps) {
         >
           팀 등록
         </button>
-        <button className="button" onClick={() => open()}>
+        <button className="button" disabled={!p.canWrite} onClick={() => open()}>
           <Plus size={15} />
           서비스 등록
         </button>
@@ -131,7 +132,7 @@ export function Catalog(p: PageProps) {
                     )}
                   </td>
                   <td>
-                    <button className="text-button" onClick={() => open(s)}>
+                    <button className="text-button" disabled={!p.canWrite} onClick={() => open(s)}>
                       편집
                     </button>
                   </td>
@@ -150,6 +151,7 @@ export function Catalog(p: PageProps) {
           {q.data?.unowned.map((s) => (
             <button
               className="scope-chip"
+              disabled={!p.canWrite}
               key={s}
               onClick={() => {
                 open();
@@ -219,7 +221,7 @@ export function Catalog(p: PageProps) {
                 </Field>
               </>
             )}
-            <button className="button" disabled={busy}>
+            <button className="button" disabled={!p.canWrite || busy}>
               저장
             </button>
           </form>

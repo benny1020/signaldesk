@@ -7,7 +7,7 @@ import rateLimit from '@fastify/rate-limit';
 import compress from '@fastify/compress';
 import staticFiles from '@fastify/static';
 import { z } from 'zod';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -32,6 +32,7 @@ import type { Storage } from './storage.ts';
 import { Engine, ruleGroup, ruleValue, type Channel, type Probe } from './engine.ts';
 import { encrypt, safeRequest } from './network.ts';
 import { dashboard, briefing } from './queries.ts';
+import { VERSION, type Session } from '../../../packages/contracts/src/session.ts';
 export type AccessToken = {
   token: string;
   role: 'admin' | 'viewer' | 'ingest';
@@ -122,11 +123,22 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
     };
   });
   const counts = { accepted: 0, rejected: 0, requests: 0, errors: 0, durations: [] as number[] };
+  const tokenHashes = config.tokens.map((token) => ({
+    ...token,
+    digest: createHash('sha256').update(token.token).digest(),
+  }));
   app.addHook('onRequest', async (req, reply) => {
     reply
       .header('X-Content-Type-Options', 'nosniff')
       .header('Referrer-Policy', 'no-referrer')
-      .header('X-Frame-Options', 'DENY');
+      .header('X-Frame-Options', 'DENY')
+      .header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+      .header(
+        'Content-Security-Policy',
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+      );
+    if (req.url.startsWith('/api/') || req.url.split('?')[0] === '/health')
+      reply.header('Cache-Control', 'no-store');
     if (!req.url.startsWith('/api/')) return;
     if (config.role === 'worker') throw httpError('Worker exposes health only', 404);
     if (config.mode === 'local') {
@@ -205,15 +217,25 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
     });
     if (status >= 500) app.log.error(error);
   });
+  function principal(req: FastifyRequest) {
+    if (config.mode === 'local')
+      return {
+        name: 'local operator',
+        role: 'admin' as const,
+        workspaces: ['demo', 'live'] as Workspace[],
+      };
+    const bearer = req.headers.authorization?.replace(/^Bearer /, '') ?? '';
+    const digest = createHash('sha256').update(bearer).digest();
+    const token = tokenHashes.find((t) => timingSafeEqual(t.digest, digest));
+    if (!token) throw httpError('A valid access token is required', 401);
+    return token;
+  }
   function access(
     req: FastifyRequest,
     workspace: Workspace,
     role: 'read' | 'write' | 'ingest' = 'read',
   ) {
-    if (config.mode === 'local') return 'local operator';
-    const bearer = req.headers.authorization?.replace(/^Bearer /, '');
-    const token = config.tokens.find((t) => t.token === bearer);
-    if (!token) throw httpError('A valid access token is required', 401);
+    const token = principal(req);
     if (!token.workspaces.includes(workspace)) throw httpError('Workspace access denied', 403);
     if (
       (role === 'read' && token.role === 'ingest') ||
@@ -242,7 +264,21 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
   const actor = (req: FastifyRequest, w: Workspace) => access(req, w, 'write');
   app.get('/health', async () => {
     await store.setting('demoNow');
-    return { status: 'ok', version: '0.3.0', backend: store.backend, role: config.role ?? 'all' };
+    return { status: 'ok', version: VERSION, backend: store.backend, role: config.role ?? 'all' };
+  });
+  app.get('/api/session', async (req): Promise<Session> => {
+    const token = principal(req);
+    if (token.role === 'ingest') throw httpError('Ingest tokens cannot open the operator UI', 403);
+    return {
+      mode: config.mode,
+      actor: token.name,
+      role: token.role,
+      workspaces: token.workspaces,
+      defaultWorkspace:
+        config.mode === 'token' && token.workspaces.includes('live') ? 'live' : token.workspaces[0],
+      canWrite: token.role === 'admin',
+      version: VERSION,
+    };
   });
   app.get('/api/bootstrap', async (req) => {
     const w = workspaceSchema.parse((req.query as { workspace?: string }).workspace ?? 'demo');
@@ -251,7 +287,7 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
       mode: config.mode,
       workspace: w,
       demoNow: Number((await store.setting('demoNow')) ?? Date.now()),
-      version: '0.4.0',
+      version: VERSION,
       diagnosisDestination: config.diagnosisProvider?.name ?? null,
       capabilities: {
         nativeJson: true,

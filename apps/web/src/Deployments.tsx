@@ -419,6 +419,7 @@ export function Deployments(p: PageProps) {
                         로그 <ArrowUpRight size={12} />
                       </button>
                       <button
+                        disabled={!p.canWrite}
                         className="text-button"
                         onClick={() =>
                           void p.mutate('/api/resources/' + r.id, { retired: !r.retired }, 'PATCH')

@@ -16,7 +16,7 @@ x-app: &app
     PGPORT: '5432'
     PGUSER: signaldesk
     PGDATABASE: signaldesk
-    PGPASSWORD: ${POSTGRES_PASSWORD:?Generate POSTGRES_PASSWORD with npm run credentials}
+    PGPASSWORD: ${POSTGRES_PASSWORD:?Generate POSTGRES_PASSWORD with npm run setup}
     AUTH_MODE: token
     ACCESS_TOKENS: ${ACCESS_TOKENS:?Generate credentials}
     CHANNEL_KEY: ${CHANNEL_KEY:?Generate credentials}
@@ -26,7 +26,7 @@ x-app: &app
     ENVIRONMENT: production
     COLLECT_LOCAL: 'false'
     REQUIRE_RESOURCE_IDENTITY: 'true'
-    SEED_DEMO: 'true'
+    SEED_DEMO: ${SEED_DEMO:-false}
     ALLOWED_DESTINATION_HOSTS: ${ALLOWED_DESTINATION_HOSTS:-}
     TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.31.240.10}
 services:

@@ -4,11 +4,26 @@
 
 Local: `npm start`, loopback port 4319. The Node entrypoint loads `.env` if present. The generated local channel key is in the SQLite settings table; local encryption does not protect a stolen database against a reader who can also read this key.
 
-Token mode: generate a new `.env` with `npm run --silent credentials > .env`, then `npm start`. For shared PostgreSQL use `docker compose --env-file .env -f deploy/compose.distributed.yaml up --build -d`; plain `docker compose up --build -d` is single-process SQLite evaluation. Generate credentials only for a new installation: overwriting an existing `.env` rotates tokens and the channel key. Token mode fails fast if there are no strong tokens or no 64-character hex CHANNEL_KEY. Do not print these values into logs, commit them, or place them in URLs. Store the key separately from production database backups. Changing it without migrating encrypted channel values makes existing channels unreadable.
+Token mode: generate a new `.env` with `npm run setup`, then `npm start`. For shared PostgreSQL use `docker compose --env-file .env -f deploy/compose.distributed.yaml up --build -d`; plain `docker compose up --build -d` is single-process SQLite evaluation. Generate credentials only for a new installation: overwriting an existing `.env` rotates tokens and the channel key. Token mode fails fast if there are no strong tokens or no 64-character hex CHANNEL_KEY. Do not print these values into logs, commit them, or place them in URLs. Store the key separately from production database backups. Changing it without migrating encrypted channel values makes existing channels unreadable.
 
 ACCESS_TOKENS is a JSON array of `{token,role,workspaces,name}`. Provision distinct ingest, viewer and admin tokens. Redeploy/restart after rotation; browser clients enter the new token. The browser keeps it in sessionStorage, not permanent localStorage. HTTPS and a restrictive reverse proxy are required for remote clients. Local mode refuses non-loopback binding.
 
 The container runs as node with no-new-privileges and dropped capabilities. Single-process Compose exposes 4320; shared PostgreSQL Compose exposes gateway 4321, both on host loopback. Mount/configure a TLS reverse proxy deliberately if you want network access. Docker is not deployed to an external host by this repository.
+
+## Installation and runtime checks
+
+`npm run setup` creates private new settings (`--output path` is optional). Exclusive creation prevents accidental token/channel-key rotation; existing files are never overwritten. No credentials are printed. The legacy `credentials` command still writes secrets to stdout for explicit advanced use and must not be redirected over an existing installation.
+
+New settings use token mode, no Demo seeding, no local OS collection and strict producer identity. Demo can be enabled deliberately with `SEED_DEMO=true`. Configure each real producer and protect the ingress before opening access. An operator connects with a viewer or admin token; ingest tokens are rejected by the UI. The session identifies its allowed workspaces. Viewer controls are disabled and the backend independently rejects writes. Disconnect clears the tab token and query cache.
+
+```bash
+npm run doctor -- --url http://127.0.0.1:4321
+npm run benchmark
+```
+
+Doctor loads the current private `.env`; alternatively configure `SIGNALDESK_OPERATOR_TOKEN` securely in the process environment. It only reads session, health, capabilities, Live resource inventory and connection state. It rejects credential/query-bearing URLs, remote cleartext and redirects. It prints safe check summaries rather than upstream responses, channel destinations, worker errors or tokens. Exit 1 denotes a failed check; 2 denotes unresolved manual evidence. It intentionally leaves notification recipient receipt and recovery/load certification unresolved. Loopback previews and missing non-example application producers remain warnings. The platform's own spans and example producers do not establish application coverage.
+
+The benchmark creates a fresh temporary SQLite WAL database, inserts 100,000 synthetic events across five independent regions, reopens it and asserts complete global/regional flow counts. It measures five sequential HTTP handler queries per scenario and removes the fixture directory. It excludes concurrent ingress, PostgreSQL/WAN and real regional failover; results depend on the machine. SQLite performs bounded query-planner optimization on opening and before aggregate queries after 10,000 inserts or one hour, following [SQLite guidance](https://www.sqlite.org/pragma.html#pragma_optimize). Receiver ranks are materialized once and relevant CLIENT ancestry is narrowed before traversal, preserving missing-context and pairing semantics.
 
 ## Capacity, health and worker
 

@@ -83,7 +83,7 @@ export function DependencyRules({
         </div>
         <button
           className="button secondary"
-          disabled={selected?.direction !== 'outbound'}
+          disabled={!p.canWrite || selected?.direction !== 'outbound'}
           onClick={create}
         >
           선택한 하위 호출에 규칙 추가
@@ -122,10 +122,15 @@ export function DependencyRules({
                 </td>
                 <td>{state(m)}</td>
                 <td>
-                  <button className="text-button" onClick={() => setEditing(m)}>
+                  <button
+                    className="text-button"
+                    disabled={!p.canWrite}
+                    onClick={() => setEditing(m)}
+                  >
                     편집
                   </button>
                   <button
+                    disabled={!p.canWrite}
                     className="text-button"
                     onClick={() =>
                       void p.mutate(
@@ -232,7 +237,7 @@ export function DependencyRules({
               리전·모듈·route별로 평가합니다. 알림은 기존 전달 정책·유지보수·확인·반복·복구 흐름을
               따릅니다. 고객 요청 전체의 SLO가 아닙니다.
             </p>
-            <button className="button" disabled={busy}>
+            <button className="button" disabled={!p.canWrite || busy}>
               {busy ? '저장 중…' : '규칙 저장'}
             </button>
           </form>

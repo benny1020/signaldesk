@@ -20,6 +20,7 @@ import type { PageProps } from '../Pages';
 import { request, queryString } from '../api';
 import { Chart, Empty, number, time } from '../components';
 import { DependencyRules } from './DependencyRules';
+import { regionalFlows } from './regions';
 import { regionLabel } from '../../../../packages/contracts/src/deployments';
 const Canvas = lazy(() => import('./FlowCanvas'));
 const Heatmap = lazy(() => import('./LatencyHeatmap'));
@@ -45,6 +46,8 @@ export function RequestFlow(p: PageProps) {
     ? String(p.params.flowView)
     : 'all';
   const data = query.data;
+  const regions = useMemo(() => (data ? regionalFlows(data) : []), [data]);
+  const choosingRegion = !p.params.region && regions.length > 1;
   const edges = useMemo(
     () =>
       data?.edges.filter((e) => {
@@ -146,41 +149,97 @@ export function RequestFlow(p: PageProps) {
           </button>
         </div>
       )}
-      <div className="flow-toolbar">
-        <div className="flow-segment" aria-label="호출 방향">
-          {[
-            ['all', '전체 흐름'],
-            ['inbound', '진입 API'],
-            ['outbound', '하위 호출'],
-            ['failures', '실패 관측'],
-          ].map(([key, title]) => (
-            <button
-              key={key}
-              disabled={!data}
-              aria-pressed={mode === key}
-              onClick={() => {
-                setFocus(null);
-                const next = data?.edges.find((e) => matchesView(e, key));
-                p.updateScope({ flowView: key === 'all' ? undefined : key, edge: next?.id });
-              }}
-            >
-              {title}
+      {choosingRegion && (
+        <section className="flow-region-entry" aria-labelledby="region-entry-title">
+          <div className="flow-section-head">
+            <div>
+              <h2 id="region-entry-title">어느 리전의 요청을 조사할까요?</h2>
+              <p>
+                동일한 형상의 독립 배포입니다. 수치는 비교하고, 호출 흐름은 리전 안에서 확인합니다.
+              </p>
+            </div>
+            <button className="text-button" onClick={() => p.navigate('deployments')}>
+              세계 지도에서 보기 <ArrowUpRight size={14} />
             </button>
-          ))}
+          </div>
+          <div className="flow-region-grid">
+            {regions.map((r) => (
+              <button
+                className="flow-region-card"
+                key={r.region}
+                onClick={() => {
+                  setFocus(null);
+                  p.updateScope({
+                    region: r.region,
+                    edge: undefined,
+                    zone: undefined,
+                    cluster: undefined,
+                    namespace: undefined,
+                    instanceId: undefined,
+                  });
+                }}
+              >
+                <span className="flow-region-title">
+                  <strong>{regionLabel(r.region)}</strong>
+                  <ArrowUpRight size={18} />
+                </span>
+                <small>
+                  {r.region} · {r.services.size}개 서비스 배포
+                </small>
+                <span className="flow-region-metrics">
+                  <span>
+                    진입 관측<b>{number(r.incoming, 0)}건</b>
+                  </span>
+                  <span>
+                    API 실패
+                    <b className={r.errors ? 'failure' : ''}>{percent(r.errors, r.incoming)}</b>
+                  </span>
+                </span>
+                <span className="flow-region-footer">
+                  하위 호출 {number(r.outgoing, 0)}건 · 재전송 {number(r.retries, 0)}건
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      {!choosingRegion && (
+        <div className="flow-toolbar">
+          <div className="flow-segment" aria-label="호출 방향">
+            {[
+              ['all', '전체 흐름'],
+              ['inbound', '진입 API'],
+              ['outbound', '하위 호출'],
+              ['failures', '실패 관측'],
+            ].map(([key, title]) => (
+              <button
+                key={key}
+                disabled={!data}
+                aria-pressed={mode === key}
+                onClick={() => {
+                  setFocus(null);
+                  const next = data?.edges.find((e) => matchesView(e, key));
+                  p.updateScope({ flowView: key === 'all' ? undefined : key, edge: next?.id });
+                }}
+              >
+                {title}
+              </button>
+            ))}
+          </div>
+          <label className="flow-search">
+            <Search size={15} />
+            <input
+              aria-label="요청 연결 검색"
+              placeholder="서비스·호스트·리전·API 검색"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <button className="button secondary" onClick={() => setMap(!map)}>
+            {map ? <Rows3 size={16} /> : <Maximize2 size={16} />} {map ? '목록 보기' : '지도 보기'}
+          </button>
         </div>
-        <label className="flow-search">
-          <Search size={15} />
-          <input
-            aria-label="요청 연결 검색"
-            placeholder="서비스·호스트·리전·API 검색"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
-        <button className="button secondary" onClick={() => setMap(!map)}>
-          {map ? <Rows3 size={16} /> : <Maximize2 size={16} />} {map ? '목록 보기' : '지도 보기'}
-        </button>
-      </div>
+      )}
       {focus && (
         <div className="flow-focus">
           {focus.name}의 연결 {focus.region !== 'unobserved' && ' / ' + focus.region}
@@ -237,7 +296,7 @@ export function RequestFlow(p: PageProps) {
             계측 가이드 <ExternalLink size={14} />
           </a>
         </div>
-      ) : (
+      ) : choosingRegion ? null : (
         data && (
           <>
             <div className={`flow-investigation ${map ? '' : 'is-table'}`}>
@@ -266,7 +325,7 @@ export function RequestFlow(p: PageProps) {
                   <>
                     <div className="flow-layout-toggle">
                       <span>리전별 독립 배포</span>
-                      <span>선택 시 해당 route·리전의 수치 확인</span>
+                      <span>화살표는 관측 건수 · 선택하면 route별 지연과 실패 확인</span>
                     </div>
                     <Suspense fallback={<Empty>지도를 불러오고 있습니다…</Empty>}>
                       <Canvas

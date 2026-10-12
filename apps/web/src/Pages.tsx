@@ -61,6 +61,7 @@ export type PageProps = {
   mutate: (path: string, body: unknown, method?: string) => Promise<unknown>;
   openForm: (kind: 'rule' | 'incident' | 'channel' | 'probe', alert?: Alert) => void;
   paused: boolean;
+  canWrite: boolean;
   notify: (message: string) => void;
   updateScope: (patch: Record<string, string | undefined>, replace?: boolean) => void;
   onRange: (from: number, to: number) => void;
@@ -670,7 +671,7 @@ export function Alerts(p: PageProps) {
                   </button>
                   <button
                     className="button secondary"
-                    disabled={a.acknowledged}
+                    disabled={!p.canWrite || a.acknowledged}
                     onClick={() =>
                       void p.mutate('/api/alerts/' + a.id, { acknowledged: true }, 'PATCH')
                     }
@@ -680,6 +681,7 @@ export function Alerts(p: PageProps) {
                   </button>
                   <button
                     className="button secondary"
+                    disabled={!p.canWrite}
                     onClick={() => {
                       if (a.snoozedUntil > Date.now())
                         void p.mutate(
@@ -697,6 +699,10 @@ export function Alerts(p: PageProps) {
                   </button>
                   <button
                     className="button"
+                    disabled={
+                      !p.canWrite &&
+                      !p.data.incidents.some((i) => i.alertId === a.id && i.status !== 'resolved')
+                    }
                     onClick={() => {
                       const linked = p.data.incidents.find(
                         (i) => i.alertId === a.id && i.status !== 'resolved',
@@ -720,7 +726,7 @@ export function Alerts(p: PageProps) {
           title="알림 규칙"
           meta="임계치 · 지속 시간 · 데이터 없음 정책"
           action={
-            <button className="button" onClick={() => p.openForm('rule')}>
+            <button disabled={!p.canWrite} className="button" onClick={() => p.openForm('rule')}>
               <Plus size={15} /> 규칙 만들기
             </button>
           }
@@ -742,7 +748,11 @@ export function Alerts(p: PageProps) {
                   <tr key={r.id}>
                     <td>
                       <strong>{r.name}</strong>
-                      <button className="text-button" onClick={() => setEditingRule(r)}>
+                      <button
+                        className="text-button"
+                        disabled={!p.canWrite}
+                        onClick={() => setEditingRule(r)}
+                      >
                         편집 · v{r.revision ?? 1}
                       </button>
                       <small>{r.pendingSince !== null ? '조건 지속 시간 확인 중' : ''}</small>
@@ -765,6 +775,7 @@ export function Alerts(p: PageProps) {
                     <td>{r.noData === 'alert' ? '알림 발생' : '무시'}</td>
                     <td>
                       <button
+                        disabled={!p.canWrite}
                         className={'toggle ' + (r.enabled ? 'on' : '')}
                         role="switch"
                         aria-checked={r.enabled}
@@ -784,7 +795,11 @@ export function Alerts(p: PageProps) {
           {!p.data.rules.length && (
             <Empty
               action={
-                <button className="button" onClick={() => p.openForm('rule')}>
+                <button
+                  disabled={!p.canWrite}
+                  className="button"
+                  onClick={() => p.openForm('rule')}
+                >
                   규칙 만들기
                 </button>
               }
@@ -921,6 +936,7 @@ function Deliveries(p: PageProps) {
                 <td>
                   {d.status === 'failed' && (
                     <button
+                      disabled={!p.canWrite}
                       className="button secondary"
                       onClick={() => void p.mutate('/api/deliveries/' + d.id + '/retry', {})}
                     >
@@ -949,7 +965,7 @@ export function Incidents(p: PageProps) {
       title="장애 관리"
       meta="근거, 담당자, 복구 과정을 하나의 타임라인으로 기록합니다"
       action={
-        <button className="button" onClick={() => p.openForm('incident')}>
+        <button disabled={!p.canWrite} className="button" onClick={() => p.openForm('incident')}>
           <Plus size={15} /> 장애 등록
         </button>
       }
@@ -1324,7 +1340,11 @@ export function ConnectionsPage(p: PageProps) {
         title="알림 채널"
         meta="HTTPS Webhook · 암호화 저장 · 5회까지 재시도"
         action={
-          <button className="button" disabled={!live} onClick={() => p.openForm('channel')}>
+          <button
+            className="button"
+            disabled={!p.canWrite || !live}
+            onClick={() => p.openForm('channel')}
+          >
             <Plus size={15} /> 채널 연결
           </button>
         }
@@ -1336,6 +1356,7 @@ export function ConnectionsPage(p: PageProps) {
               <strong>{c.name}</strong>
               <span>{c.enabled ? '사용 중' : '중지됨'}</span>
               <button
+                disabled={!p.canWrite}
                 className="button secondary"
                 onClick={() =>
                   void p.mutate('/api/channels/' + c.id, { enabled: !c.enabled }, 'PATCH')
@@ -1358,7 +1379,11 @@ export function ConnectionsPage(p: PageProps) {
         title="API 가용성 검사"
         meta="HTTPS GET · 60초 간격 · 2xx 응답을 정상으로 판단"
         action={
-          <button className="button" disabled={!live} onClick={() => p.openForm('probe')}>
+          <button
+            className="button"
+            disabled={!p.canWrite || !live}
+            onClick={() => p.openForm('probe')}
+          >
             <Plus size={15} /> API 검사 추가
           </button>
         }
@@ -1390,6 +1415,7 @@ export function ConnectionsPage(p: PageProps) {
                   <td>{v.lastError ?? '—'}</td>
                   <td>
                     <button
+                      disabled={!p.canWrite}
                       className="button secondary"
                       onClick={() =>
                         void p.mutate('/api/probes/' + v.id, { enabled: !v.enabled }, 'PATCH')

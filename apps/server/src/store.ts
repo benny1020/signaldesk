@@ -57,6 +57,8 @@ export class Store implements TelemetryStore, ControlStore {
   readonly backend = 'sqlite' as const;
   private controlTail: Promise<unknown> = Promise.resolve();
   private workerLocks = new Set<string>();
+  private changedSinceOptimize = 0;
+  private optimizedAt = Date.now();
   db: DatabaseSync;
   constructor(
     path: string,
@@ -106,6 +108,7 @@ export class Store implements TelemetryStore, ControlStore {
         this.db.prepare('INSERT INTO migrations VALUES(2,?)').run(Date.now());
       });
     }
+    this.db.exec('PRAGMA optimize=0x10002');
   }
   transaction<T>(fn: () => T): T {
     this.db.exec('BEGIN IMMEDIATE');
@@ -120,7 +123,7 @@ export class Store implements TelemetryStore, ControlStore {
   }
   append(workspace: Workspace, events: TelemetryEvent[]): number {
     const insert = this.db.prepare('INSERT OR IGNORE INTO telemetry VALUES(?,?,?,?,?,?,?)');
-    return this.transaction(() => {
+    const accepted = this.transaction(() => {
       const accepted = events.reduce((count, event) => {
         const clean = { ...sanitize(event), ...identity(event), id: event.id ?? randomUUID() };
         const changed = Number(
@@ -159,6 +162,8 @@ export class Store implements TelemetryStore, ControlStore {
         );
       return accepted;
     });
+    this.changedSinceOptimize += accepted;
+    return accepted;
   }
   query(kind: TelemetryEvent['kind'], scope: QueryScope): Page<TelemetryEvent> {
     const limit = Math.min(scope.limit ?? 1000, 10000);
@@ -236,6 +241,12 @@ export class Store implements TelemetryStore, ControlStore {
     kind: import('../../../packages/contracts/src/index.ts').AggregateKind,
     scope: QueryScope & { route?: string; latencyMs?: number },
   ) {
+    if (this.changedSinceOptimize >= 10000 || Date.now() - this.optimizedAt >= 3600000) {
+      // Bounded analysis lets SQLite index materialized joins instead of repeatedly scanning them.
+      this.db.exec('PRAGMA optimize=0x10002');
+      this.changedSinceOptimize = 0;
+      this.optimizedAt = Date.now();
+    }
     const { sql, values, stepMs } = aggregateSQL(kind, scope, false);
     const rows = this.db.prepare(sql).all(...(values as (string | number)[])) as Record<
       string,

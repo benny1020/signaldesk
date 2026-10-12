@@ -74,12 +74,16 @@ export function AIOperations(p: PageProps) {
         meta="구조화된 expected/actual의 필드별 일치 평가 · 모델을 호출하는 평가가 아닙니다"
         action={
           <div className="row-actions">
-            <button className="button secondary" onClick={() => setForm('dataset')}>
+            <button
+              className="button secondary"
+              disabled={!p.canWrite}
+              onClick={() => setForm('dataset')}
+            >
               데이터셋 등록
             </button>
             <button
               className="button"
-              disabled={!datasets.data?.items.length}
+              disabled={!p.canWrite || !datasets.data?.items.length}
               onClick={() => {
                 setDatasetId(datasets.data?.items[0]?.id ?? '');
                 setForm('run');
@@ -245,7 +249,7 @@ export function AIOperations(p: PageProps) {
                 </Field>
               </>
             )}
-            <button className="button" disabled={busy}>
+            <button className="button" disabled={!p.canWrite || busy}>
               {form === 'dataset' ? '데이터셋 저장' : '평가 실행'}
             </button>
           </form>

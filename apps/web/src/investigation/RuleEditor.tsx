@@ -69,7 +69,7 @@ export function RuleEditor({
             <option value="warning">주의</option>
           </select>
         </Field>
-        <button className="button" disabled={busy}>
+        <button className="button" disabled={!p.canWrite || busy}>
           새 버전 저장
         </button>
       </form>

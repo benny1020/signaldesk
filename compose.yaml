@@ -7,6 +7,9 @@ services:
       AUTH_MODE: token
       ACCESS_TOKENS: ${ACCESS_TOKENS:?Generate credentials and set ACCESS_TOKENS in .env}
       CHANNEL_KEY: ${CHANNEL_KEY:?Set CHANNEL_KEY in .env}
+      SEED_DEMO: ${SEED_DEMO:-false}
+      COLLECT_LOCAL: ${COLLECT_LOCAL:-false}
+      REQUIRE_RESOURCE_IDENTITY: ${REQUIRE_RESOURCE_IDENTITY:-true}
       MAX_EVENTS: ${MAX_EVENTS:-1000000}
       ALLOWED_DESTINATION_HOSTS: ${ALLOWED_DESTINATION_HOSTS:-}
     volumes:

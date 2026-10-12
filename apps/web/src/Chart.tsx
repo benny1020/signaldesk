@@ -128,7 +128,7 @@ export default function Chart({
             splitNumber: 5,
             axisLabel: {
               hideOverlap: true,
-              color: '#748397',
+              color: '#53677d',
               fontSize: 11,
               formatter: (v: number) =>
                 new Date(v).toLocaleTimeString('ko-KR', {
@@ -146,7 +146,7 @@ export default function Chart({
             axisLabel: { color: '#53677d', fontSize: 11 },
             splitLine: { lineStyle: { color: '#edf1f6' } },
             name: visible[0]?.unit,
-            nameTextStyle: { color: '#748397', fontSize: 10 },
+            nameTextStyle: { color: '#53677d', fontSize: 10 },
             nameGap: 4,
           },
           dataZoom: [{ type: 'inside', filterMode: 'none', zoomOnMouseWheel: 'ctrl' }],

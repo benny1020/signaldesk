@@ -16,6 +16,9 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm audit --audit-level=high
+      - name: Disk-backed 100k request-flow acceptance
+        timeout-minutes: 5
+        run: npm run benchmark
   container:
     runs-on: ubuntu-latest
     steps:

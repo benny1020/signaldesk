@@ -27,33 +27,35 @@ A dependency retry can fail while the final customer response succeeds. SignalDe
 
 SignalDesk is a self-hosted monitoring and incident workspace for engineers who need to move from a service symptom to logs, a request trace, an alert, and an incident timeline without losing context. It pairs a dense, readable interface with a working ingestion API, persistent storage and background evaluation.
 
-**Release status: v0.4 request-flow workspace / internal pilot.** CLIENT/SERVER pairing, observed request/attempt percentiles, regional request maps, dependency rules, shared PostgreSQL API/worker execution, service ownership, SLOs, notifications and AI evaluation are implemented. Fresh v0.4 browser checks passed at 1280×900 and 390×844 for the map, numeric heatmap view, scoped trace/log investigation, dependency-rule editing and keyboard interaction. Screens below use Demo fixtures. Demo and Live are separate. Production volume, geographic failover and external model accuracy require deployment evidence; see [verification](docs/VERIFICATION.md) and [redesign decisions](docs/REDESIGN.md).
+**Release status: v0.4 self-hosted beta.** A region-first investigation workspace, operator/viewer access, safe installation, runtime checks, CLIENT/SERVER pairing, SLOs, notification policies and AI evaluation are implemented. Europe, North America, Japan, Singapore and Seoul run independent application stacks with no inter-region business calls. Screens below use Demo fixtures. Demo and Live are separate. Opening a production installation requires the environment-specific evidence in the [launch checklist](docs/LAUNCH_READINESS.md); [verification](docs/VERIFICATION.md) records the actual checks and limits.
+
+![Choose an independent region before investigating its calls - Demo](docs/screenshots/launch/regions.jpg)
 
 ## Features
 
-| Workspace         | Implemented behavior                                                                                                                                                    |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Request flow      | Caller → our services → dependencies; paired spans counted once, region/module expansion, observed p50/p95, timeout/429/retransmission and correlated final API outcome |
-| Dependency rules  | Source/target/route-specific error percentage or p95, minimum evidence, unknown/stale status, multiple-worker locks and existing notification lifecycle                 |
-| Deployments       | Regional comparison, per-resource inventory, six shared deployment filters, instance drilldown and explicit retirement/resume                                           |
-| Operating metrics | Shared environment/service/time filters, request rate, request-weighted error percentage, maximum service p95, incident context and actionable service rows             |
-| Services & APIs   | RED signals, full retained endpoint counts/errors/average/max latency, exact resource drilldown and partial trace discovery                                             |
-| Infrastructure    | Real local CPU and OS memory collection every 5 seconds, timestamped host measurements; JSON ingestion for external hosts                                               |
-| Logs              | Message/level search, virtualized rows, stable keyset pagination, JSON export, attributes and trace linking                                                             |
-| Traces            | Indexed trace lookup, parent/child waterfall, duration, status and span attributes                                                                                      |
-| Alerts            | Resource/region/service rule groups, group-aware preview, independent duration/recovery/no-data, acknowledgment and snooze                                              |
-| Notifications     | Owner/dimension routing, policy preview, maintenance, separate firing/repeat/recovery receipts, retries and delivery health                                             |
-| Incidents         | Independent states, owners, multiple linked alerts and persistent investigation notes/timeline                                                                          |
-| Analytics         | Full retained log histogram/heatmap, service/environment/code/message error identities, source-backed relationship view                                                 |
-| AI workloads      | Provider/model, token usage, reported cost with provenance, TTFT, AI latency and evaluation source/version; trace-linked evidence                                       |
-| Operations        | Region-selected synthetic checks, platform/outbox/worker health, scoped roles, bounded capacity and audit trail                                                         |
-| Catalog           | Stable service/team IDs, aliases, ownership, repository/runbook links, criticality, regions and orphan discovery                                                        |
-| Service levels    | Revisioned availability/latency definitions, observed-span denominator, minimum coverage, error budget and burn alerts                                                  |
-| AI evaluations    | Versioned structured datasets, candidate results, pinned baseline, exact-match scores/coverage/regressions, opt-in evidence gateway                                     |
+| Workspace         | Implemented behavior                                                                                                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request flow      | Caller → our services → dependencies; paired spans counted once, region-first investigation, observed p50/p95, timeout/429/retransmission and correlated final API outcome |
+| Dependency rules  | Source/target/route-specific error percentage or p95, minimum evidence, unknown/stale status, multiple-worker locks and existing notification lifecycle                    |
+| Deployments       | Regional comparison, per-resource inventory, six shared deployment filters, instance drilldown and explicit retirement/resume                                              |
+| Operating metrics | Shared environment/service/time filters, request rate, request-weighted error percentage, maximum service p95, incident context and actionable service rows                |
+| Services & APIs   | RED signals, full retained endpoint counts/errors/average/max latency, exact resource drilldown and partial trace discovery                                                |
+| Infrastructure    | Real local CPU and OS memory collection every 5 seconds, timestamped host measurements; JSON ingestion for external hosts                                                  |
+| Logs              | Message/level search, virtualized rows, stable keyset pagination, JSON export, attributes and trace linking                                                                |
+| Traces            | Indexed trace lookup, parent/child waterfall, duration, status and span attributes                                                                                         |
+| Alerts            | Resource/region/service rule groups, group-aware preview, independent duration/recovery/no-data, acknowledgment and snooze                                                 |
+| Notifications     | Owner/dimension routing, policy preview, maintenance, separate firing/repeat/recovery receipts, retries and delivery health                                                |
+| Incidents         | Independent states, owners, multiple linked alerts and persistent investigation notes/timeline                                                                             |
+| Analytics         | Full retained log histogram/heatmap, service/environment/code/message error identities, source-backed relationship view                                                    |
+| AI workloads      | Provider/model, token usage, reported cost with provenance, TTFT, AI latency and evaluation source/version; trace-linked evidence                                          |
+| Operations        | Region-selected synthetic checks, platform/outbox/worker health, scoped roles, bounded capacity and audit trail                                                            |
+| Catalog           | Stable service/team IDs, aliases, ownership, repository/runbook links, criticality, regions and orphan discovery                                                           |
+| Service levels    | Revisioned availability/latency definitions, observed-span denominator, minimum coverage, error budget and burn alerts                                                     |
+| AI evaluations    | Versioned structured datasets, candidate results, pinned baseline, exact-match scores/coverage/regressions, opt-in evidence gateway                                        |
 
 The primary map uses **React Flow 12.12 + ELK 0.12** with layout in a lazy Web Worker, a disclosed graph cap and equivalent numeric connections. Selected connections show an **ECharts latency distribution heatmap** with real bin counts and empty gaps. Charts use modular **Apache ECharts 6.1**, with shared investigation range selection, missing-data gaps, series toggles, explicit units, CSV and numeric table alternatives. Absolute UTC bounds, KST/UTC display, saved views and detail URL restoration carry the investigation context. Logs use **TanStack Virtual** and paged server queries. React Query coordinates polling and invalidation. Reduced motion, native modal focus handling and small-screen layouts are included.
 
-![Region-contained request flow and correlated API outcomes · Demo](docs/screenshots/v04/region-local-flow.jpg)
+![Region-contained request flow and correlated API outcomes · Demo](docs/screenshots/launch/regional-flow.jpg)
 
 ![Same-region trace with a failed provider attempt and successful retry · Demo](docs/screenshots/v04/regional-trace.jpg)
 
@@ -101,10 +103,25 @@ npm run dev
 
 Web: http://127.0.0.1:5178. API: http://127.0.0.1:4319. The `.env` file is loaded by the Node entrypoint. If you change the API port, update the development proxy in `apps/web/vite.config.ts`.
 
+### Safe operator installation
+
+`npm run setup` creates a new `.env` with owner-only permissions, never replaces an existing installation and never prints secrets. Open it privately to retrieve the distinct administrator, viewer and Live-only ingest tokens. Fresh operator installations disable Demo seeding and local host collection, and require producer module/region/instance identity. For an isolated visual preview, set `SEED_DEMO=true` before the first start. The UI verifies allowed workspaces, shows read-only permissions and clears queries when disconnecting.
+
+```bash
+npm run setup
+npm run build
+npm start
+npm run doctor
+```
+
+Doctor performs read-only authenticated checks. Exit **1** means runtime failure; **2** means manual evidence remains, including HTTPS, actual recipient receipt and recovery/load exercises. It never certifies production readiness from HTTP health alone. `npm run doctor -- --url http://127.0.0.1:4321` checks the reference PostgreSQL gateway. See [operations](docs/OPERATIONS.md).
+
+`npm run benchmark` creates/removes its own temporary disk-backed database, checks 100,000 fixture events after reopening and measures global/scoped queries. This is a bounded fixture exercise, not production throughput certification.
+
 ### Shared PostgreSQL deployment
 
 ```bash
-npm run --silent credentials > .env
+npm run setup
 docker compose --env-file .env -f deploy/compose.distributed.yaml up --build -d
 ```
 
@@ -119,11 +136,11 @@ For a real regional deployment, use managed PostgreSQL HA, regional Collector pe
 ### Single-process Docker evaluation
 
 ```bash
-npm run --silent credentials > .env
+npm run setup
 docker compose up --build -d
 ```
 
-Open **http://127.0.0.1:4320** and enter the admin token from your local `.env`. Do not commit this file. The container runs as a non-root user in token mode and stores data in a named volume. Its local host collector observes the container's OS view, not necessarily your physical host. See [operations](docs/OPERATIONS.md) for deployment, backups and recovery.
+Open **http://127.0.0.1:4320** and enter the admin token from your local `.env`. Do not commit this file. The container runs as a non-root user in token mode and stores data in a named volume. Local host collection is off by default; when enabled, it observes the container's OS view, not necessarily your physical host. See [operations](docs/OPERATIONS.md) for deployment, backups and recovery.
 
 ## Connect a service
 

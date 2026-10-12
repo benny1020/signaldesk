@@ -44,6 +44,7 @@ export function NotificationPolicies(p: PageProps) {
         </div>
         <button
           className="button secondary"
+          disabled={!p.canWrite}
           onClick={() => {
             setForm('maintenance');
             setName('');
@@ -53,6 +54,7 @@ export function NotificationPolicies(p: PageProps) {
         </button>
         <button
           className="button"
+          disabled={!p.canWrite}
           onClick={() => {
             setEditing(null);
             setService('');
@@ -85,6 +87,7 @@ export function NotificationPolicies(p: PageProps) {
                   <td>
                     <button
                       className="text-button"
+                      disabled={!p.canWrite}
                       onClick={() => {
                         setEditing(r);
                         setName(r.name);
@@ -120,6 +123,7 @@ export function NotificationPolicies(p: PageProps) {
                   </td>
                   <td>
                     <button
+                      disabled={!p.canWrite}
                       className="text-button"
                       onClick={() =>
                         void p.mutate(
@@ -154,6 +158,7 @@ export function NotificationPolicies(p: PageProps) {
             </small>
             {m.to > Date.now() && (
               <button
+                disabled={!p.canWrite}
                 className="text-button"
                 onClick={() =>
                   void p.mutate(
@@ -352,7 +357,10 @@ export function NotificationPolicies(p: PageProps) {
                 </Field>
               </>
             )}
-            <button className="button" disabled={busy || (form === 'route' && !selected.length)}>
+            <button
+              className="button"
+              disabled={!p.canWrite || busy || (form === 'route' && !selected.length)}
+            >
               저장
             </button>
           </form>

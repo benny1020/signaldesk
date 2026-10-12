@@ -1,77 +1,190 @@
+import assert from 'node:assert/strict';
+import type { FastifyInstance } from 'fastify';
+import type { Response as InjectResponse } from 'light-my-request';
+import { mkdtemp, stat, rm } from 'node:fs/promises';
+import { tmpdir, availableParallelism } from 'node:os';
+import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { Store } from '../apps/server/src/store.ts';
-import { dashboard } from '../apps/server/src/queries.ts';
-import type { TelemetryEvent } from '../packages/contracts/src/index.ts';
-const store = new Store(':memory:'),
-  now = Date.now(),
+import { createApp } from '../apps/server/src/app.ts';
+import { exampleRegions } from '../packages/contracts/src/deployments.ts';
+import type { TelemetryEvent, RequestFlow, Span } from '../packages/contracts/src/index.ts';
+// Isolated disk-backed fixture exercise; never opens an operator's existing database.
+const dir = await mkdtemp(join(tmpdir(), 'signaldesk-benchmark-'));
+const path = join(dir, 'fixture.sqlite'),
   total = 100000,
-  start = performance.now();
-for (let batch = 0; batch < total; batch += 1000) {
-  const rows: TelemetryEvent[] = [];
-  for (let i = batch; i < batch + 1000; i++) {
-    const timestamp = now - Math.floor(i / 100) * 30000,
-      service = 'service-' + (i % 20),
-      environment = 'production';
-    if (i % 10 < 6)
-      rows.push({
-        id: 'e' + i,
-        kind: 'metric',
-        timestamp,
-        service,
-        environment,
-        name: i % 3 === 0 ? 'request_rate' : i % 3 === 1 ? 'error_pct' : 'latency_p95_ms',
-        value: i % 3 === 1 ? 0.2 : i % 3 === 0 ? 30 : 160,
-      });
-    else if (i % 10 < 9)
-      rows.push({
-        id: 'e' + i,
-        kind: 'log',
-        timestamp,
-        service,
-        environment,
-        level: 'info',
-        message: 'Fixture request completed',
-        attributes: {},
-      });
-    else
-      rows.push({
-        id: 'e' + i,
+  now = Date.now();
+let store = new Store(path),
+  app: FastifyInstance | undefined;
+try {
+  const started = performance.now();
+  for (let first = 0; first < total / 8; first += 125) {
+    const rows: TelemetryEvent[] = [];
+    for (let i = first; i < first + 125; i++) {
+      const region = exampleRegions[i % 5].id,
+        service = 'benchmark-orders-' + (Math.floor(i / 5) % 20);
+      const timestamp = now - (i % 1000) * 3000,
+        traceId = 'bench-' + i;
+      const resource = {
+        environment: 'benchmark',
+        region,
+        module: 'api',
+        instanceId: 'pod-' + (Math.floor(i / 100) % 10),
+      };
+      const span = (patch: Partial<Span>): Span => ({
         kind: 'span',
         timestamp,
+        traceId,
         service,
-        environment,
-        traceId: 'trace-' + i,
-        spanId: 'span-' + i,
-        name: 'GET /fixture',
-        durationMs: 160,
+        ...resource,
+        spanId: 'root',
+        name: 'POST /orders',
+        spanKind: 'server',
+        durationMs: 230,
         status: 'ok',
-        attributes: {},
+        attributes: {
+          'http.route': '/orders',
+          'http.request.method': 'POST',
+          'http.response.status_code': 200,
+        },
+        ...patch,
       });
+      rows.push(
+        span({ id: traceId + '-root', service: 'benchmark-gateway', module: 'edge' }),
+        span({
+          id: traceId + '-call',
+          spanId: 'call',
+          parentSpanId: 'root',
+          spanKind: 'client',
+          service: 'benchmark-gateway',
+          module: 'edge',
+          durationMs: 180,
+          attributes: {
+            'server.address': service,
+            'url.template': '/orders',
+            'http.request.method': 'POST',
+          },
+        }),
+        span({
+          id: traceId + '-receive',
+          spanId: 'receive',
+          parentSpanId: 'call',
+          durationMs: 160,
+        }),
+        span({
+          id: traceId + '-provider',
+          spanId: 'provider',
+          parentSpanId: 'receive',
+          spanKind: 'client',
+          durationMs: i % 29 === 0 ? 600 : 80,
+          status: i % 29 === 0 ? 'error' : 'ok',
+          attributes: {
+            'server.address': 'benchmark-provider.test',
+            'url.template': '/authorize',
+            'http.request.method': 'POST',
+            'http.response.status_code': i % 29 === 0 ? 503 : 200,
+          },
+        }),
+        ...(['request_rate', 'error_pct', 'latency_p95_ms'] as const).map((name) => ({
+          kind: 'metric' as const,
+          id: traceId + '-' + name,
+          timestamp,
+          service,
+          ...resource,
+          name,
+          value: name === 'request_rate' ? 30 : name === 'error_pct' ? 0.2 : 160,
+        })),
+        {
+          kind: 'log',
+          id: traceId + '-log',
+          timestamp,
+          service,
+          ...resource,
+          traceId,
+          level: 'info',
+          message: 'Synthetic benchmark request',
+          attributes: {},
+        },
+      );
+    }
+    assert.equal(await store.append('live', rows), rows.length);
   }
-  store.append('live', rows);
+  const ingestionMs = performance.now() - started;
+  store.close();
+  store = new Store(path);
+  assert.equal(store.occupancy(), total, 'fixture survives close and reopen');
+  ({ app } = await createApp(store, {
+    mode: 'local',
+    tokens: [],
+    key: randomBytes(32),
+    allowedHosts: [],
+  }));
+  const measures: Record<string, { medianMs: number; p95Ms: number; samples: number }> = {};
+  for (const [name, route] of [
+    ['dashboard', '/api/dashboard'],
+    ['all-region-flow', '/api/request-flow'],
+    ['seoul-flow', '/api/request-flow'],
+  ]) {
+    const samples: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      const before = performance.now();
+      const response: InjectResponse = await app.inject(
+        route +
+          `?workspace=live&from=${now - 3600000}&to=${now}` +
+          (name === 'seoul-flow' ? '&region=ap-northeast-2' : ''),
+      );
+      assert.equal(response.statusCode, 200);
+      if (name !== 'dashboard') {
+        const data: RequestFlow = response.json();
+        assert.equal(data.truncated, false);
+        assert.equal(
+          data.edges.reduce((n, e) => n + e.count, 0),
+          ((total / 8) * 3) / (name === 'seoul-flow' ? 5 : 1),
+        );
+        if (name === 'seoul-flow')
+          assert.ok(
+            data.nodes
+              .filter((n) => n.type === 'workload')
+              .every((n) => n.region === 'ap-northeast-2'),
+          );
+      }
+      samples.push(performance.now() - before);
+    }
+    samples.sort((a, b) => a - b);
+    measures[name] = {
+      medianMs: +samples[2].toFixed(2),
+      p95Ms: +samples[4].toFixed(2),
+      samples: samples.length,
+    };
+  }
+  console.log(
+    JSON.stringify(
+      {
+        runtime: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        logicalCPUs: availableParallelism(),
+        storage: 'temporary disk-backed SQLite WAL',
+        fixtureEvents: total,
+        regions: 5,
+        orderServicesPerRegion: 20,
+        instancesPerOrderService: 10,
+        ingestionMs: Math.round(ingestionMs),
+        databaseMiB: +((await stat(path)).size / 1048576).toFixed(1),
+        rssMiB: +(process.memoryUsage().rss / 1048576).toFixed(1),
+        queryMeasures: measures,
+        persistedAfterReopen: true,
+        regionalCountsAsserted: true,
+        productionLoadCertification: false,
+        limitations:
+          'Sequential fixture append and HTTP handler queries on one machine. No concurrent producers, network ingress, PostgreSQL/WAN, retention churn or HA certification.',
+      },
+      null,
+      2,
+    ),
+  );
+} finally {
+  if (app) await app.close();
+  store.close();
+  await rm(dir, { recursive: true, force: true });
 }
-const ingestionMs = performance.now() - start,
-  durations: number[] = [];
-for (let i = 0; i < 20; i++) {
-  const before = performance.now();
-  await dashboard(store, { workspace: 'live', from: now - 24 * 3600000, to: now });
-  durations.push(performance.now() - before);
-}
-durations.sort((a, b) => a - b);
-console.log(
-  JSON.stringify(
-    {
-      runtime: process.version,
-      storage: 'in-memory SQLite',
-      fixtureEvents: total,
-      ingestionMs: Math.round(ingestionMs),
-      dashboardIterations: durations.length,
-      dashboardMedianMs: +durations[10].toFixed(2),
-      dashboardP95Ms: +durations[18].toFixed(2),
-      queryCaps: { metrics: 10000, logs: 300, spans: 1000 },
-      productionLoadCertification: false,
-    },
-    null,
-    2,
-  ),
-);
-store.close();

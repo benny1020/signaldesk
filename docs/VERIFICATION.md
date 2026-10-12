@@ -1,5 +1,38 @@
 # Verification record
 
+## Self-hosted launch hardening · 2026-10-13
+
+This acceptance targets a self-hosted operator product. No public production endpoint was provisioned. Existing Demo and Live databases were preserved; a separate token-authenticated SQLite preview on port 4325 was used.
+
+- Added session/workspace/role regressions, same-origin browser security and non-cacheable responses, safe handling of proxy/non-JSON/network failures, private non-destructive setup, authenticated doctor checks, and independent regional entry totals. The local suite contains 81 tests; release CI runs formatting, TypeScript, the suite, production build, dependency audit and the disk fixture described below. Confirm the result for the installed commit in [CI](https://github.com/benny1020/signaldesk/actions/workflows/ci.yml).
+- Chrome at 1280×1000 checked neutral initial connection, invalid-token recovery, denied ingest-token UI access, a Live-only viewer's authorized workspace and disabled write controls, admin controls, logout and replacement-session isolation. The operator UI does not fetch an unauthorized workspace to populate selectors. Server mutation permissions remain the security boundary.
+- The region-first entry displayed five separate deployments. Selecting Seoul retained the investigation time and scoped the graph. Focusing `payment-worker` showed its observed caller and external dependency with concise count labels; selecting a route exposed p50/p95, timeout/retry totals and correlated API outcomes. The numeric latency table contained the observed buckets. Opening timeout evidence showed eight spans in one region, including the failed attempt, successful retry and successful entry response. Provider internal location remained unobserved.
+- Production assets were served by Fastify with the new content policy. React Flow's real ELK worker, ECharts and the offline map rendered under that policy. Selected muted/chart/map/edge foregrounds measured 5.5–5.92 contrast against white using the W3C formula; this is a partial contrast check, not full WCAG certification.
+- At 390×844, regional entry and map/list views had document width 390px. Request tables scrolled in their own containers (370px parent, 630/800px table content). Enter opened Seoul from the region card. Mobile logout returned to the blank-token connection form; a fresh admin connection at the root landed in Live. Enter selected Europe on the world map, and Escape closed service search. The verified tab reported no warning/error console entries. Screenshots in [launch](screenshots/launch) contain fixtures only; browser acceptance is manual, not a committed E2E suite or real-user study.
+- Executed the request-flow example against this isolated preview: 24 successful loopback customer requests and 32 simulated-provider attempts. All workload nodes stayed in Seoul. No production server, real provider, alert recipient or external model was invoked.
+- `doctor` confirmed token access, database reads, worker heartbeat, retained capacity, strict resource identity and an unblocked outbox. It returned exit 2 because only example application producers were connected and HTTPS, actual recipient receipt and recovery/load evidence remained unverified. The command did not misclassify this preview as production-ready.
+
+### On-disk retained-query fixture
+
+`npm run benchmark` creates and removes its own SQLite WAL database. It inserts 100,000 events: 12,500 traces with four spans each, three metrics and one log. There are five independent region labels, 20 order services per region and ten order instances per service, plus regional gateways. It closes/reopens storage and runs five sequential Fastify HTTP-handler queries for each view. Assertions require 37,500 global and 7,500 Seoul flow observations, no truncation and exclusively Seoul workload nodes for the scoped result.
+
+Local Node 26.4.0, macOS arm64, ten logical CPUs:
+
+| Measurement                               | Observed result       |
+| ----------------------------------------- | --------------------- |
+| Fixture insertion                         | 4,031ms               |
+| SQLite file / process RSS                 | 77.1MiB / 333.4MiB    |
+| Dashboard handler, median / p95           | 231.66 / 235.81ms     |
+| All-region flow handler, median / p95     | 2,659.40 / 2,693.17ms |
+| Seoul flow handler, median / p95          | 2,046.35 / 2,085.32ms |
+| Persistence and identity/count assertions | Passed after reopen   |
+
+The first larger fixture exposed repeated receiver scans and unnecessarily broad ancestry work. Receiver materialization, selection before ancestry, route-filter pushdown and bounded SQLite statistics maintenance repaired that bottleneck. The initial full run was stopped before completion, so no full-run speedup factor is claimed. PostgreSQL retains its existing 15-second statement budget; shared-backend correctness and recovery remain CI gates.
+
+Five samples have limited statistical meaning. This fixture includes disk storage and HTTP-handler execution; it excludes network ingress, concurrent ingestion/queries, PostgreSQL performance, browser rendering, WAN and physical failover. It is not a production latency or throughput guarantee. SQLite remains a single-process backend; use shared PostgreSQL for multiple APIs/workers and measure the intended volume.
+
+Remaining environment-specific gates and recovery responsibilities are recorded in [launch readiness](LAUNCH_READINESS.md). Full OTLP protobuf/gRPC, SaaS tenancy/SSO/on-call, geographic HA, actual external notification receipt and real LLM accuracy remain unverified or outside the current product boundary. The existing ELK bundle build warning remains; the real browser worker was exercised.
+
 ## Independent regional deployment nodes · 2026-10-13
 
 - Clarified that every region runs a separately deployed application stack: service names and code can match, but running APIs/workers and DB/queue/cache infrastructure are independent. Removed the graph's cross-region service-collapsing option and its synthetic `region=all` nodes. All-region status comparison remains available; request-flow workload nodes always retain their actual region/environment/module identity.

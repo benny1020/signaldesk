@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useState, useRef, type RefObject } from 'react';
 import {
   ReactFlow,
   Background,
@@ -7,6 +7,8 @@ import {
   Handle,
   Position,
   MarkerType,
+  useNodesInitialized,
+  useReactFlow,
   type NodeProps,
   type Node,
   type Edge,
@@ -54,9 +56,11 @@ const FlowCard = memo(function FlowCard({ data }: NodeProps<Node<NodeData>>) {
       </span>
       <div className="flow-node-count">
         <span>
-          {data.incoming
-            ? `진입 ${data.incoming.toLocaleString()}`
-            : `호출 ${data.outgoing.toLocaleString()}`}
+          {n.type === 'dependency'
+            ? `호출 ${data.incoming.toLocaleString()}`
+            : data.incoming
+              ? `진입 ${data.incoming.toLocaleString()}`
+              : `호출 ${data.outgoing.toLocaleString()}`}
         </span>
         <b>{data.errors ? '실패 연결 있음' : '실패 관측 없음'}</b>
       </div>
@@ -66,6 +70,26 @@ const FlowCard = memo(function FlowCard({ data }: NodeProps<Node<NodeData>>) {
   );
 });
 const nodeTypes = { workload: FlowCard };
+function FitMeasuredGraph({ container }: { container: RefObject<HTMLDivElement | null> }) {
+  const initialized = useNodesInitialized();
+  const { fitView } = useReactFlow();
+  useEffect(() => {
+    if (!initialized || !container.current) return;
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => void fitView({ padding: 0.06, maxZoom: 1 }));
+    };
+    const observer = new ResizeObserver(fit);
+    observer.observe(container.current);
+    fit();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, [initialized, fitView, container]);
+  return null;
+}
 export default function FlowCanvas({
   data,
   edges,
@@ -79,7 +103,9 @@ export default function FlowCanvas({
   onSelect: (e: FlowEdge) => void;
   onFocus: (n: FlowNode) => void;
 }) {
+  const container = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<Record<string, { x: number; y: number }>>({}),
+    [positionKey, setPositionKey] = useState(''),
     [layoutError, setLayoutError] = useState('');
   const grouped = useMemo(() => {
     const groups = new Map<string, FlowEdge[]>();
@@ -107,11 +133,11 @@ export default function FlowCanvas({
         layoutOptions: {
           'elk.algorithm': 'layered',
           'elk.direction': 'RIGHT',
-          'elk.spacing.nodeNode': '36',
-          'elk.layered.spacing.nodeNodeBetweenLayers': '105',
+          'elk.spacing.nodeNode': '28',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '62',
           'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
         },
-        children: ids.map((id) => ({ id, width: 222, height: 168 })),
+        children: ids.map((id) => ({ id, width: 196, height: 156 })),
         edges: shown.map((g) => ({
           id: g[0].source + g[0].target,
           sources: [g[0].source],
@@ -119,12 +145,14 @@ export default function FlowCanvas({
         })),
       })
       .then((graph) => {
-        if (!stopped)
+        if (!stopped) {
           setPositions(
             Object.fromEntries(
               (graph.children ?? []).map((n) => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]),
             ),
           );
+          setPositionKey(layoutKey);
+        }
       })
       .catch(() => {
         if (!stopped) setLayoutError('지도 배치에 실패했습니다. 연결 목록에서 조사할 수 있습니다.');
@@ -142,6 +170,8 @@ export default function FlowCanvas({
     return {
       id,
       type: 'workload',
+      width: 196,
+      height: 156,
       position: positions[id] ?? { x: 0, y: 0 },
       data: {
         identity,
@@ -162,12 +192,12 @@ export default function FlowCanvas({
         data.nodes.find((n) => n.id === e.target)?.type === 'dependency' ||
         data.nodes.find((n) => n.id === e.source)?.type === 'caller';
     const focus = selected?.source === e.source && selected?.target === e.target,
-      color = failed ? '#c23f57' : focus ? '#315cc8' : '#468a99';
+      color = failed ? '#c23f57' : focus ? '#315cc8' : '#2c6e7b';
     return {
       id: e.id,
       source: e.source,
       target: e.target,
-      label: `${count.toLocaleString()}건 · 최대 route p95 ${Math.round(p95)}ms`,
+      label: `${count.toLocaleString()}건`,
       type: 'smoothstep',
       markerEnd: { type: MarkerType.ArrowClosed, color, width: 18, height: 18 },
       style: {
@@ -179,12 +209,12 @@ export default function FlowCanvas({
       labelStyle: { fill: color, fontSize: 11, fontWeight: 600 },
       labelBgStyle: { fill: '#f8fbfe', fillOpacity: 0.96 },
       labelBgPadding: [6, 4],
-      ariaLabel: `${data.nodes.find((n) => n.id === e.source)?.name}에서 ${data.nodes.find((n) => n.id === e.target)?.name}, ${count}건, 실패 ${failed}건`,
+      ariaLabel: `${data.nodes.find((n) => n.id === e.source)?.name}에서 ${data.nodes.find((n) => n.id === e.target)?.name}, ${count}건, 실패 ${failed}건, 최대 route p95 ${Math.round(p95)}ms`,
     };
   });
-  const ready = ids.every((id) => positions[id]);
+  const ready = positionKey === layoutKey && ids.every((id) => positions[id]);
   return (
-    <div className="flow-canvas" aria-label="요청 흐름 지도">
+    <div className="flow-canvas" ref={container} aria-label="요청 흐름 지도">
       <div className="flow-map-caption">
         <span>호출자</span>
         <span>우리 서비스</span>
@@ -205,7 +235,7 @@ export default function FlowCanvas({
           edgesReconnectable={false}
           deleteKeyCode={null}
           fitView
-          fitViewOptions={{ padding: 0.16, maxZoom: 1 }}
+          fitViewOptions={{ padding: 0.06, maxZoom: 1 }}
           minZoom={0.2}
           maxZoom={1.8}
           onEdgeClick={(_, e) => {
@@ -221,6 +251,7 @@ export default function FlowCanvas({
             'controls.interactive.ariaLabel': '지도 조작',
           }}
         >
+          <FitMeasuredGraph container={container} />
           <Background color="#ccdae5" gap={22} size={1} />
           <Controls showInteractive={false} />
           {ids.length > 10 && <MiniMap pannable zoomable nodeColor="#8bbac5" />}

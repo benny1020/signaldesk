@@ -325,7 +325,7 @@ export function Detail({
               <select
                 aria-label="장애 상태"
                 value={incident.status}
-                disabled={busy}
+                disabled={!p.canWrite || busy}
                 onChange={(e) => void changeIncident({ status: e.target.value })}
               >
                 {['investigating', 'identified', 'monitoring', 'resolved'].map((s) => (
@@ -349,11 +349,12 @@ export function Detail({
                   aria-label="담당자 변경"
                   placeholder={incident.owner || '담당자 또는 팀'}
                   value={owner}
+                  readOnly={!p.canWrite}
                   onChange={(e) => setOwner(e.target.value)}
                 />
                 <button
                   className="button secondary"
-                  disabled={busy}
+                  disabled={!p.canWrite || busy}
                   onClick={() => void changeIncident({ owner })}
                 >
                   저장
@@ -375,7 +376,7 @@ export function Detail({
                   <label className="checkbox" key={a.id}>
                     <input
                       type="checkbox"
-                      disabled={busy}
+                      disabled={!p.canWrite || busy}
                       checked={ids.includes(a.id)}
                       onChange={(e) =>
                         void changeIncident({
@@ -414,11 +415,12 @@ export function Detail({
                 maxLength={2000}
                 rows={3}
                 value={note}
+                disabled={!p.canWrite}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder="확인한 근거와 다음 조치를 기록하세요."
               />
             </label>
-            <button className="button" disabled={busy || !note.trim()}>
+            <button className="button" disabled={!p.canWrite || busy || !note.trim()}>
               타임라인에 기록
             </button>
           </form>

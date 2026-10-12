@@ -1,6 +1,6 @@
 # API reference
 
-Version 0.3. Native contract: `packages/contracts/src/index.ts`. Content-Type: `application/json`. No CORS is enabled; serve the UI and API from the same origin. In local mode loopback Host and Origin are enforced. In token mode use an Authorization bearer token.
+Version 0.4. Native contract: `packages/contracts/src/index.ts`. Content-Type: `application/json`. No CORS is enabled; serve the UI and API from the same origin. In local mode loopback Host and Origin are enforced. In token mode use an Authorization bearer token.
 
 ## Scope and roles
 
@@ -19,6 +19,7 @@ Local mode is equivalent to a local operator and is never allowed on a non-loopb
 | Method       | Path                        | Behavior / role                                                                                                                          |
 | ------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | GET          | `/health`                   | Unauthenticated process + database health                                                                                                |
+| GET          | `/api/session`              | Current operator identity, role, allowed workspaces and write permission; ingest denied, no credentials / read                           |
 | GET          | `/api/bootstrap`            | Runtime mode, demo clock, capability flags / read                                                                                        |
 | GET          | `/api/dashboard`            | Bounded correlated service/host/chart/AI view / read                                                                                     |
 | GET / PATCH  | `/api/resources[/:id]`      | Scoped inventory / explicit `{retired:boolean}` lifecycle, read / admin                                                                  |

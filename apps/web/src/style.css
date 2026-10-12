@@ -11,7 +11,7 @@
   font-size: 13px;
   font-synthesis: none;
   --ink: #12283f;
-  --muted: #6d7f93;
+  --muted: #566b82;
   --blue: #2869d8;
   --line: #e2e9f1;
   --red: #c84646;
@@ -23,6 +23,122 @@
 }
 body {
   margin: 0;
+}
+.access-gate {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+  background: #fff;
+}
+.access-story {
+  padding: clamp(32px, 6vw, 96px);
+  background: #12283f;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.access-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 25px;
+  font-weight: 800;
+  margin-bottom: 64px;
+}
+.access-story h1 {
+  font-size: clamp(29px, 3vw, 46px);
+  line-height: 1.35;
+  letter-spacing: -1.4px;
+}
+.access-story p {
+  margin-top: 24px;
+  max-width: 440px;
+  font-size: 16px;
+  line-height: 1.9;
+  color: #c5d4e4;
+}
+.access-regions {
+  border-top: 1px solid #426078;
+  padding-top: 24px;
+  margin-top: 48px;
+  color: #c5d4e4;
+  font-size: 13px;
+}
+.access-panel {
+  width: min(100%, 470px);
+  align-self: center;
+  justify-self: center;
+  padding: 40px;
+}
+.access-panel > svg {
+  color: #2869d8;
+  margin-bottom: 20px;
+}
+.access-panel h2 {
+  font-size: 23px;
+}
+.access-panel > p {
+  margin: 14px 0 28px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.access-panel .form {
+  margin-top: 24px;
+}
+.access-panel input,
+.access-panel .button {
+  min-height: 46px;
+}
+.access-pending {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.access-readonly {
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  border-left: 3px solid #4b76b9;
+  background: #eaf1fc;
+  color: #284f83;
+}
+.mobile-disconnect {
+  display: none;
+}
+@media (max-width: 950px) {
+  .mobile-disconnect {
+    display: inline-flex;
+  }
+}
+@media (max-width: 720px) {
+  .access-gate {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .access-story {
+    padding: 30px 26px;
+  }
+  .access-brand {
+    margin-bottom: 24px;
+    font-size: 22px;
+  }
+  .access-story h1 {
+    font-size: 28px;
+  }
+  .access-story p {
+    font-size: 14px;
+    margin-top: 14px;
+  }
+  .access-regions {
+    margin-top: 22px;
+    padding-top: 16px;
+    font-size: 12px;
+  }
+  .access-panel {
+    padding: 30px 26px;
+  }
 }
 button,
 input,
