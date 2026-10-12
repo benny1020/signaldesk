@@ -130,7 +130,7 @@ export default function LatencyHeatmap({
       {!data.histogram.length ? (
         <div className="empty">분포를 계산할 관측 호출이 없습니다.</div>
       ) : table ? (
-        <div className="table-scroll flow-hist-table">
+        <div key="table" className="table-scroll flow-hist-table">
           <table>
             <thead>
               <tr>
@@ -152,6 +152,7 @@ export default function LatencyHeatmap({
         </div>
       ) : (
         <div
+          key="chart"
           ref={ref}
           style={{ height: 268 }}
           role="img"

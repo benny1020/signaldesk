@@ -44,7 +44,7 @@ Never infer client identity from IP or trust arbitrary headers. A low-cardinalit
 
 ## Work state
 
-Research, original implementation, local HTTP example and SQLite/PostgreSQL correctness are completed. Container/distributed and exact-head CI verification are recorded separately in VERIFICATION.md. Fresh desktop/mobile visual acceptance is pending because the Mac is locked and no enabled browser is available. This document is not a production-readiness or upstream-parity claim.
+Research, original implementation, local HTTP example and SQLite/PostgreSQL correctness are completed. Container/distributed and exact-head CI verification are recorded separately in VERIFICATION.md. Fresh desktop/mobile visual acceptance was completed after the host became accessible; browser-discovered ELK worker initialization and heatmap/table DOM reuse failures were repaired, and duplicate route rows now disclose region/module/environment. This document is not a production-readiness or upstream-parity claim.
 
 ## AI application review
 

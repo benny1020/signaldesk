@@ -27,7 +27,7 @@ A dependency retry can fail while the final customer response succeeds. SignalDe
 
 SignalDesk is a self-hosted monitoring and incident workspace for engineers who need to move from a service symptom to logs, a request trace, an alert, and an incident timeline without losing context. It pairs a dense, readable interface with a working ingestion API, persistent storage and background evaluation.
 
-**Release status: v0.4 request-flow workspace / internal pilot.** CLIENT/SERVER pairing, observed request/attempt percentiles, regional request maps, dependency rules, shared PostgreSQL API/worker execution, service ownership, SLOs, notifications and AI evaluation are implemented. Fresh v0.4 desktop/mobile visual acceptance is pending because the verification host is locked; existing screenshots below are historical v0.3 examples. Demo and Live are separate. Production volume, geographic failover and external model accuracy require deployment evidence; see [verification](docs/VERIFICATION.md) and [redesign decisions](docs/REDESIGN.md).
+**Release status: v0.4 request-flow workspace / internal pilot.** CLIENT/SERVER pairing, observed request/attempt percentiles, regional request maps, dependency rules, shared PostgreSQL API/worker execution, service ownership, SLOs, notifications and AI evaluation are implemented. Fresh v0.4 browser checks passed at 1280×900 and 390×844 for the map, numeric heatmap view, scoped trace/log investigation, dependency-rule editing and keyboard interaction. Screens below use Demo fixtures. Demo and Live are separate. Production volume, geographic failover and external model accuracy require deployment evidence; see [verification](docs/VERIFICATION.md) and [redesign decisions](docs/REDESIGN.md).
 
 ## Features
 
@@ -53,8 +53,14 @@ SignalDesk is a self-hosted monitoring and incident workspace for engineers who 
 
 The primary map uses **React Flow 12.12 + ELK 0.12** with layout in a lazy Web Worker, a disclosed graph cap and equivalent numeric connections. Selected connections show an **ECharts latency distribution heatmap** with real bin counts and empty gaps. Charts use modular **Apache ECharts 6.1**, with shared investigation range selection, missing-data gaps, series toggles, explicit units, CSV and numeric table alternatives. Absolute UTC bounds, KST/UTC display, saved views and detail URL restoration carry the investigation context. Logs use **TanStack Virtual** and paged server queries. React Query coordinates polling and invalidation. Reduced motion, native modal focus handling and small-screen layouts are included.
 
+![v0.4 request map and correlated API outcomes](docs/screenshots/v04/request-map.jpg)
+
+![v0.4 latency distribution and trends](docs/screenshots/v04/latency.jpg)
+
+![v0.4 cross-region trace and recovered timeout](docs/screenshots/v04/trace.jpg)
+
 <details>
-<summary>Historical v0.3 screens: not fresh v0.4 visual acceptance</summary>
+<summary>Historical v0.3 / v0.2 screens</summary>
 
 ![Previous v0.3 overview](docs/screenshots/v03/overview.png)
 

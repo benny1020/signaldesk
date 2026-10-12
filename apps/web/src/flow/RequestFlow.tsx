@@ -556,7 +556,7 @@ function ConnectionTable({
   selected?: FlowEdge;
   select: (e: FlowEdge) => void;
 }) {
-  const name = (id: string) => data.nodes.find((n) => n.id === id)?.name;
+  const node = (id: string) => data.nodes.find((n) => n.id === id);
   return (
     <div className="table-scroll flow-connection-table">
       <table>
@@ -573,10 +573,15 @@ function ConnectionTable({
             <tr key={e.id} className={selected?.id === e.id ? 'selected' : ''}>
               <td>
                 <button onClick={() => select(e)} className="text-button">
-                  {name(e.source)} → {name(e.target)}
+                  {node(e.source)?.name} → {node(e.target)?.name}
                 </button>
                 <small>
                   {e.method} {e.route}
+                </small>
+                <small>
+                  {node(e.source)?.region} → {node(e.target)?.region} ·{' '}
+                  {node(e.direction === 'inbound' ? e.target : e.source)?.module} ·{' '}
+                  {node(e.direction === 'inbound' ? e.target : e.source)?.environment}
                 </small>
               </td>
               <td>{number(e.count, 0)}</td>

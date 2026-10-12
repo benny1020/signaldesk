@@ -13,6 +13,8 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Globe, Box, Cloud, Database } from 'lucide-react';
+import ELK from 'elkjs/lib/elk-api.js';
+import ELKWorker from 'elkjs/lib/elk-worker.min.js?worker';
 import type { RequestFlow, FlowNode, FlowEdge } from '../../../../packages/contracts/src/index';
 type NodeData = {
   identity: FlowNode;
@@ -99,30 +101,40 @@ export default function FlowCanvas({
   useEffect(() => {
     let stopped = false;
     setLayoutError('');
-    const worker = new Worker(new URL('./layout-worker.ts', import.meta.url), { type: 'module' });
-    worker.onmessage = (
-      e: MessageEvent<{ positions?: Record<string, { x: number; y: number }>; error?: string }>,
-    ) => {
-      if (stopped) return;
-      if (e.data.positions) setPositions(e.data.positions);
-      else setLayoutError(e.data.error ?? '배치를 완료하지 못했습니다. 숫자 목록을 사용하세요.');
-      worker.terminate();
-    };
-    worker.onerror = () => {
-      if (!stopped) setLayoutError('지도 배치를 불러오지 못했습니다. 연결 목록을 사용하세요.');
-      worker.terminate();
-    };
-    worker.postMessage({
-      ids,
-      links: shown.map((g) => ({
-        id: g[0].source + g[0].target,
-        source: g[0].source,
-        target: g[0].target,
-      })),
-    });
+    // Use ELK's real browser worker: the bundled fallback expects a DOM context.
+    const layout = new ELK({ workerFactory: () => new ELKWorker() });
+    layout
+      .layout({
+        id: 'root',
+        layoutOptions: {
+          'elk.algorithm': 'layered',
+          'elk.direction': 'RIGHT',
+          'elk.spacing.nodeNode': '36',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '105',
+          'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+        },
+        children: ids.map((id) => ({ id, width: 222, height: 168 })),
+        edges: shown.map((g) => ({
+          id: g[0].source + g[0].target,
+          sources: [g[0].source],
+          targets: [g[0].target],
+        })),
+      })
+      .then((graph) => {
+        if (!stopped)
+          setPositions(
+            Object.fromEntries(
+              (graph.children ?? []).map((n) => [n.id, { x: n.x ?? 0, y: n.y ?? 0 }]),
+            ),
+          );
+      })
+      .catch(() => {
+        if (!stopped) setLayoutError('지도 배치에 실패했습니다. 연결 목록에서 조사할 수 있습니다.');
+      })
+      .finally(() => layout.terminateWorker());
     return () => {
       stopped = true;
-      worker.terminate();
+      layout.terminateWorker();
     };
   }, [layoutKey]);
   const nodes: Node<NodeData>[] = ids.map((id) => {
