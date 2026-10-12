@@ -14,7 +14,13 @@ flowchart LR
 
 **현재는 자체 호스팅 베타입니다.** 독립 리전 선택부터 호출 지도·트레이스·로그 조사까지 연결하고, 관리자·조회 권한, 안전한 설치와 운영 점검 도구를 제공합니다. 실제 운영 공개 전에는 [출시 점검표](docs/LAUNCH_READINESS.md)의 해당 환경 증거가 필요합니다. 아래 화면은 Demo 예제 데이터이며 [검증 기록](docs/VERIFICATION.md)에 확인한 범위를 구분했습니다.
 
-![독립 리전 비교에서 요청 조사 시작 · Demo](docs/screenshots/launch/regions.jpg)
+![업무별 메뉴와 독립 리전 비교 · Demo](docs/screenshots/navigation/desktop.png)
+
+16개 화면을 **운영 현황·요청 조사·장애 대응·서비스 품질·관리**의 5개 업무 영역으로 묶었습니다. 사이드바에서 한 영역의 하위 메뉴를 펼치고, 본문 상단에서 관련 화면을 바로 이동합니다. `Ctrl/Cmd+K`로 전체 메뉴·관측 서비스를 검색할 수 있고 모바일에는 이름이 있는 바로가기와 같은 전체 메뉴를 제공합니다. 메뉴 이동 시 환경·리전·서비스·조사 시간을 유지하며 상세 근거 선택은 정리합니다. [메뉴·UX 설계와 검증](docs/NAVIGATION_UX.md).
+
+![업무 용어로 찾는 전체 메뉴 · Demo](docs/screenshots/navigation/menu.png)
+
+[모바일 화면](docs/screenshots/navigation/mobile.png)도 같은 메뉴와 리전 범위를 제공합니다.
 
 ![리전 안에서 실패 서비스에 집중하는 요청 조사 · Demo](docs/screenshots/launch/regional-flow.jpg)
 

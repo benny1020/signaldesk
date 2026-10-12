@@ -7,30 +7,18 @@ import {
   APIAnalysis,
   PlatformHealth,
 } from './Investigation';
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Globe,
-  LayoutDashboard,
-  Boxes,
-  Server,
-  ScrollText,
-  GitBranch,
-  Bell,
-  ShieldAlert,
-  ChartNoAxesCombined,
   Sparkles,
-  Plug,
   Search,
   Pause,
   Play,
   Plus,
-  ChevronDown,
-  Check,
-  Command,
   ArrowUpRight,
   RefreshCw,
   LogOut,
+  Menu,
 } from 'lucide-react';
 import type {
   Dashboard,
@@ -47,7 +35,6 @@ import {
   Traces,
   Alerts,
   Incidents,
-  Analytics,
   AIWorkloads,
   ConnectionsPage,
   type Selection,
@@ -55,151 +42,27 @@ import {
 } from './Pages';
 import { ResourceScope, Deployments } from './Deployments';
 import { dimensionKeys } from '../../../packages/contracts/src/index';
-import { Dialog, Empty } from './components';
+import { Dialog } from './components';
 import { CreateForm } from './Forms';
 import { Detail } from './Detail';
 import { request, queryString } from './api';
 import { RequestFlow } from './flow/RequestFlow';
 import { AccessGate } from './AccessGate';
 import type { Session } from '../../../packages/contracts/src/session';
+import {
+  GroupedNavigation,
+  SectionNavigation,
+  MobileNavigation,
+  NavigationMenu,
+} from './Navigation';
+import {
+  navigationPages,
+  navigationGroup,
+  navigationHref,
+  navigationServices,
+} from './navigation-model';
+import './navigation.css';
 import './flow/style.css';
-const navigation = [
-  {
-    key: 'platform',
-    name: '플랫폼 상태',
-    icon: ShieldAlert,
-    description: '현재 수집·저장·평가·전달 상태를 확인합니다.',
-  },
-  {
-    key: 'catalog',
-    name: '서비스 카탈로그',
-    icon: Boxes,
-    description: '서비스 담당 팀과 운영 자료를 연결합니다.',
-  },
-  {
-    key: 'slos',
-    name: '서비스 수준',
-    icon: ShieldAlert,
-    description: '공통 SLI와 오류 예산을 평가합니다.',
-  },
-  {
-    key: 'policies',
-    name: '전달 정책',
-    icon: Bell,
-    description: '담당 팀별 라우팅과 유지보수 시간을 관리합니다.',
-  },
-  {
-    key: 'metrics',
-    name: '운영 지표',
-    icon: ChartNoAxesCombined,
-    description: '서비스와 인프라의 운영 지표를 확인합니다.',
-  },
-
-  {
-    key: 'overview',
-    name: '요청 흐름',
-    icon: LayoutDashboard,
-    description: '호출자에서 우리 API와 외부 의존성까지 조사합니다.',
-  },
-  {
-    key: 'services',
-    name: '서비스 및 API',
-    icon: Boxes,
-    description: '요청량, 오류, 응답 지연을 서비스별로 비교합니다.',
-  },
-  {
-    key: 'deployments',
-    name: '배포 및 인스턴스',
-    icon: Globe,
-    description: '리전·모듈·클러스터별 배포와 인스턴스를 비교합니다.',
-  },
-  {
-    key: 'hosts',
-    name: '인프라',
-    icon: Server,
-    description: '서버의 리소스와 데이터 신선도를 확인합니다.',
-  },
-  {
-    key: 'logs',
-    name: '로그',
-    icon: ScrollText,
-    description: '필요한 로그를 찾고 요청 근거를 연결합니다.',
-  },
-  {
-    key: 'traces',
-    name: '트레이스',
-    icon: GitBranch,
-    description: '요청 흐름에서 지연과 실패를 찾습니다.',
-  },
-  {
-    key: 'alerts',
-    name: '알림 관리',
-    icon: Bell,
-    description: '규칙부터 확인, 전달 이력까지 관리합니다.',
-  },
-  {
-    key: 'incidents',
-    name: '장애 관리',
-    icon: ShieldAlert,
-    description: '담당자와 조사·복구 과정을 기록합니다.',
-  },
-  {
-    key: 'analytics',
-    name: '분석',
-    icon: ChartNoAxesCombined,
-    description: '오류 패턴과 관측 요청의 상태를 분석합니다.',
-  },
-  {
-    key: 'ai',
-    name: 'AI 워크로드',
-    icon: Sparkles,
-    description: '모델 호출의 지연, 토큰, 비용과 평가 근거를 봅니다.',
-  },
-  {
-    key: 'connections',
-    name: '연결 및 설정',
-    icon: Plug,
-    description: '데이터 수집, 알림 채널과 API 검사를 연결합니다.',
-  },
-].sort(
-  (a, b) =>
-    [
-      'overview',
-      'services',
-      'catalog',
-      'deployments',
-      'hosts',
-      'logs',
-      'traces',
-      'alerts',
-      'incidents',
-      'slos',
-      'policies',
-      'analytics',
-      'metrics',
-      'ai',
-      'platform',
-      'connections',
-    ].indexOf(a.key) -
-    [
-      'overview',
-      'services',
-      'catalog',
-      'deployments',
-      'hosts',
-      'logs',
-      'traces',
-      'alerts',
-      'incidents',
-      'slos',
-      'policies',
-      'analytics',
-      'metrics',
-      'ai',
-      'platform',
-      'connections',
-    ].indexOf(b.key),
-);
 function AIWorkspace(p: PageProps) {
   const [details, setDetails] = useState(false);
   return (
@@ -345,6 +208,10 @@ export default function App() {
     enabled: bootstrap.isSuccess && workspaceAllowed,
     refetchInterval: paused ? false : 10000,
   });
+  const menuServices = useMemo(
+    () => navigationServices(inventory.data?.items ?? [], params),
+    [inventory.data, params],
+  );
   const selectedLog = useQuery({
     queryKey: ['selected-log', url.get('detailId'), params],
     enabled:
@@ -361,8 +228,8 @@ export default function App() {
       ),
     retry: false,
   });
-  const current = (navigation.find((n) => n.key === page) ??
-      navigation.find((n) => n.key === 'overview'))!,
+  const current = (navigationPages.find((n) => n.key === page) ??
+      navigationPages.find((n) => n.key === 'overview'))!,
     PageComponent = pages[page];
   const update = useCallback((patch: Record<string, string | undefined>, replace = false) => {
     const next = new URLSearchParams(location.search);
@@ -405,11 +272,6 @@ export default function App() {
     });
   };
   useEffect(() => {
-    document
-      .querySelector('.sidebar nav [aria-current="page"]')
-      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  }, [page, bootstrap.isSuccess]);
-  useEffect(() => {
     const type = url.get('detail'),
       id = url.get('detailId');
     if (type === 'trace' && id) setSelection({ type: 'trace', id });
@@ -423,31 +285,49 @@ export default function App() {
       if (incident) setSelection({ type: 'incident', incident });
     } else setSelection(null);
   }, [url.toString(), dashboard.data, selectedLog.data]);
-  const navigate = (next: string, s?: string) => {
-    update({
-      page: next,
-      detail: undefined,
-      detailId: undefined,
-      search: undefined,
-      level: undefined,
-      route: undefined,
-      edge: undefined,
-      ...(s !== undefined ? { service: s } : {}),
-    });
+  const navigate = (next: string, serviceName?: string) => {
+    const query = new URLSearchParams(navigationHref(url, next).slice(1));
+    if (serviceName !== undefined) {
+      if (serviceName) query.set('service', serviceName);
+      else query.delete('service');
+    }
+    history.pushState(null, '', '?' + query.toString());
+    setUrl(query);
     setSelection(null);
+  };
+  const previousPage = useRef(page);
+  useEffect(() => {
+    document.title = `${current.name} · SignalDesk`;
+    if (previousPage.current !== page) {
+      document.getElementById('workspace-content')?.focus({ preventScroll: true });
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      previousPage.current = page;
+    }
+  }, [page, current.name]);
+  const openNavigation = () => {
+    setSearch('');
+    setSearchOpen(true);
+  };
+  const navProps = {
+    page,
+    url,
+    navigate,
+    firing: dashboard.data?.alerts.filter((alert) => alert.status === 'firing').length ?? 0,
   };
   useEffect(() => {
     const handler = () => {
       setUrl(new URLSearchParams(location.search));
       setSelection(null);
+      setSearchOpen(false);
     };
     addEventListener('popstate', handler);
     return () => removeEventListener('popstate', handler);
   }, []);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
+        setSearch('');
         setSearchOpen((v) => !v);
       }
     };
@@ -517,6 +397,7 @@ export default function App() {
     setSelection(null);
     setForm(null);
     setSearchOpen(false);
+    setSearch('');
     setToast('');
     setAuthRevision((revision) => revision + 1);
   }
@@ -531,11 +412,15 @@ export default function App() {
     );
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#workspace-content">
+        본문으로 바로 이동
+      </a>
       <aside className="sidebar">
         <a
           className="brand"
-          href={'?page=overview&workspace=' + workspace}
+          href={navigationHref(url, 'overview')}
           onClick={(e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
             e.preventDefault();
             navigate('overview');
           }}
@@ -580,9 +465,14 @@ export default function App() {
             </select>
           </div>
         </div>
-        <button className="sidebar-search" onClick={() => setSearchOpen(true)}>
+        <button
+          className="sidebar-search"
+          aria-haspopup="dialog"
+          aria-keyshortcuts="Meta+K Control+K"
+          onClick={openNavigation}
+        >
           <Search size={15} />
-          <span>서비스 빠른 이동</span>
+          <span>메뉴·서비스 검색</span>
           <kbd>⌘ K</kbd>
         </button>
         <label className="sidebar-timezone">
@@ -596,30 +486,7 @@ export default function App() {
             <option value="UTC">UTC</option>
           </select>
         </label>
-        <nav aria-label="주 메뉴">
-          {navigation.map((item) => (
-            <a
-              key={item.key}
-              aria-label={item.name}
-              href={
-                '?' + new URLSearchParams({ ...Object.fromEntries(url), page: item.key }).toString()
-              }
-              className={page === item.key ? 'active' : ''}
-              aria-current={page === item.key ? 'page' : undefined}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(item.key);
-              }}
-            >
-              <item.icon size={18} />
-              <span>{item.name}</span>
-              {item.key === 'alerts' &&
-                !!dashboard.data?.alerts.filter((a) => a.status === 'firing').length && (
-                  <b>{dashboard.data.alerts.filter((a) => a.status === 'firing').length}</b>
-                )}
-            </a>
-          ))}
-        </nav>
+        <GroupedNavigation {...navProps} />
         <div className="sidebar-bottom">
           <a href="https://github.com/benny1020/signaldesk" target="_blank" rel="noreferrer">
             프로젝트 문서 <ArrowUpRight size={14} />
@@ -643,6 +510,14 @@ export default function App() {
       <div className="work-area">
         <header className="context-bar">
           <div className="context-left">
+            <button
+              className="icon-button mobile-menu-trigger"
+              aria-label="전체 메뉴 열기"
+              aria-haspopup="dialog"
+              onClick={openNavigation}
+            >
+              <Menu size={20} />
+            </button>
             <button
               aria-label="워크스페이스 전환"
               className={'workspace-pill ' + workspace}
@@ -720,10 +595,14 @@ export default function App() {
             </select>
             <button
               className={'live-button ' + (paused ? 'is-paused' : '')}
+              aria-label={paused ? '자동 새로고침 재개' : '자동 새로고침 일시 중지 (5초 간격)'}
               onClick={() => setPaused(!paused)}
             >
               {paused ? <Play size={13} /> : <Pause size={13} />}{' '}
-              {paused ? '새로고침 재개' : '5초 새로고침'}
+              <span className="refresh-label">{paused ? '새로고침 재개' : '5초 새로고침'}</span>
+              <span className="refresh-mobile-label" aria-hidden="true">
+                {paused ? '재개' : '자동 5초'}
+              </span>
             </button>
             <button
               className="icon-button"
@@ -750,11 +629,11 @@ export default function App() {
           update={update}
           truncated={inventory.data?.truncated ?? false}
         />
-        <main>
+        <main id="workspace-content" tabIndex={-1}>
           <div className="page-heading">
             <div>
               <div className="breadcrumb">
-                운영 워크스페이스 <span>/</span> {current.name}
+                {navigationGroup(page).name} <span>/</span> {current.name}
               </div>
               <h1>{current.name}</h1>
               <p>{current.description}</p>
@@ -780,6 +659,7 @@ export default function App() {
               )}
             </div>
           </div>
+          <SectionNavigation {...navProps} />
           {!canWrite && (
             <div className="access-readonly" role="status">
               조회 전용으로 연결했습니다. 규칙·장애·설정 변경에는 관리자 권한이 필요합니다.
@@ -959,37 +839,27 @@ export default function App() {
           onClose={() => select(null)}
         />
       )}{' '}
+      <MobileNavigation {...navProps} openMenu={openNavigation} />
       {searchOpen && (
-        <Dialog title="서비스 빠른 이동" onClose={() => setSearchOpen(false)}>
-          <div className="search-field">
-            <Search size={17} />
-            <input
-              autoFocus
-              aria-label="서비스 찾기"
-              placeholder="서비스 이름으로 찾기"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="command-results">
-            {dashboard.data?.services
-              .filter((s) => s.name.includes(search))
-              .map((s) => (
-                <button
-                  key={s.name + s.environment}
-                  onClick={() => {
-                    setSearchOpen(false);
-                    select({ type: 'service', name: s.name });
-                  }}
-                >
-                  <Boxes size={17} />
-                  {s.name}
-                  <span>{s.environment}</span>
-                </button>
-              ))}
-            {!dashboard.data?.services.length && <Empty>수집된 서비스가 없습니다.</Empty>}
-          </div>
-        </Dialog>
+        <NavigationMenu
+          {...navProps}
+          search={search}
+          setSearch={setSearch}
+          services={menuServices}
+          close={() => setSearchOpen(false)}
+          onService={(service) => {
+            update({
+              service: service.name,
+              environment: service.environment,
+              detail: 'service',
+              detailId: service.name,
+              ...(!url.get('from') && dashboard.data
+                ? { from: String(dashboard.data.window.from), to: String(dashboard.data.window.to) }
+                : {}),
+            });
+            setSelection({ type: 'service', name: service.name });
+          }}
+        />
       )}
     </div>
   );

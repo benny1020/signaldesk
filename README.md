@@ -29,7 +29,11 @@ SignalDesk is a self-hosted monitoring and incident workspace for engineers who 
 
 **Release status: v0.4 self-hosted beta.** A region-first investigation workspace, operator/viewer access, safe installation, runtime checks, CLIENT/SERVER pairing, SLOs, notification policies and AI evaluation are implemented. Europe, North America, Japan, Singapore and Seoul run independent application stacks with no inter-region business calls. Screens below use Demo fixtures. Demo and Live are separate. Opening a production installation requires the environment-specific evidence in the [launch checklist](docs/LAUNCH_READINESS.md); [verification](docs/VERIFICATION.md) records the actual checks and limits.
 
-![Choose an independent region before investigating its calls - Demo](docs/screenshots/launch/regions.jpg)
+![Grouped navigation and independent regional deployments - Demo](docs/screenshots/navigation/desktop.png)
+
+Sixteen screens are organized into five work areas: **운영 현황** (operations), **요청 조사** (request investigation), **장애 대응** (incident response), **서비스 품질** (service quality) and **관리** (administration). Expand one area in the sidebar or use the related links beside the current page. The searchable full menu (`Ctrl/Cmd+K`) also finds observed services; mobile provides named shortcuts and the same menu. Environment, region, service and investigation time stay in the URL across destinations. [Navigation design and acceptance](docs/NAVIGATION_UX.md).
+
+![Searchable task menu with grouped destinations - Demo](docs/screenshots/navigation/menu.png)
 
 ## Features
 

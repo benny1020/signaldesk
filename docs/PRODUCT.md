@@ -13,7 +13,7 @@ SignalDesk connects server and API telemetry to the operational decisions made d
 
 ## Information architecture
 
-Overview, Deployments & instances, Services & APIs, Infrastructure, Logs, Traces, Alerts, Incidents, Analytics, AI workloads, Connections. Alerts includes rules and delivery history. Connections includes token setup and ingest health.
+Five work areas organize sixteen destinations: **운영 현황** (dashboard, regional deployments, services/APIs, infrastructure), **요청 조사** (request flow, logs, traces, error analysis), **장애 대응** (alerts/rules, incidents, delivery/maintenance), **서비스 품질** (SLO/error budget, AI observation/evaluation), and **관리** (catalog, connections/checks, platform health). The current area's children form a sidebar disclosure layer and related page links. A searchable menu and named mobile shortcuts provide equivalent access. [Navigation UX](NAVIGATION_UX.md) specifies the scope, history and keyboard contracts.
 
 ## Scope
 
@@ -25,7 +25,7 @@ Later: columnar/time-series adapters, managed DB/geographic failover certificati
 
 Color: Ink #12283f, Canvas #f3f6fa, Surface #ffffff, Ocean #2869d8, Teal #087f8c, Fault #c84646, Warning #a96a12. Color encodes state; icons and words repeat the meaning.
 
-Type: bundled Manrope for product text, system Korean sans fallback, system monospace only for trace IDs/log content. 14px table/body, 22px page heading, 30px key measurement. Layout: 216px navigation, shared context bar, charts paired with actionable service rows, right-side evidence drawer. Compact tables keep comparisons aligned. Charts are not decorative card backgrounds.
+Type: bundled Manrope for product text, system Korean sans fallback, system monospace only for trace IDs/log content. Readable 14px navigation labels, 23px page headings, compact aligned comparison tables. Layout: 244px navigation (228px below 1200px), shared context bar, related page links, charts paired with actionable service rows and right-side evidence drawer. Below 1051px, a full menu replaces the sidebar; below 701px, four named shortcuts appear. Charts are not decorative card backgrounds.
 
 ```
 navigation | workspace / environment / service / time / pause
