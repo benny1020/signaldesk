@@ -113,7 +113,7 @@ try {
         providerAttempts: attempts,
         workspace: 'live',
         environment: 'example',
-        view: endpoint + '/?page=overview&workspace=live&environment=example&range=15m',
+        view: endpoint + '/?page=overview&workspace=live&environment=example&range=30',
       },
       null,
       2,
