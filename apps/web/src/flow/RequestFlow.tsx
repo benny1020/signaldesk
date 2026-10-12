@@ -357,20 +357,32 @@ export function RequestFlow(p: PageProps) {
                     </dl>
                     {selected.direction === 'outbound' && (
                       <div className="flow-customer">
-                        <h3>연결된 우리 API 응답</h3>
+                        <h3>관측 진입 API 응답</h3>
                         <div>
                           <span>하위 실패 + API 실패</span>
-                          <strong>{selected.impactedRequests}건</strong>
+                          <strong>{selected.impactedEntries}건</strong>
                         </div>
                         <div>
                           <span>하위 실패 + API 성공</span>
-                          <strong>{selected.recoveredRequests}건</strong>
+                          <strong>{selected.recoveredEntries}건</strong>
                         </div>
                         <p>
-                          상위 SERVER {selected.parentRequests}개 요청과 연결. 같은 실패 원인이라는
-                          뜻은 아닙니다.
+                          진입 SERVER {selected.entryRequests}개 요청과 연결. 미계측·유실 구간은
+                          근거 없음이며 원인 판정은 아닙니다.
                         </p>
                       </div>
+                    )}
+                    {selected.direction === 'outbound' && (
+                      <details className="flow-local-response">
+                        <summary>
+                          직접 호출 서비스 API 응답 · {selected.parentRequests}개 연결
+                        </summary>
+                        <p>
+                          하위 실패 + API 실패 {selected.impactedRequests}건<br />
+                          하위 실패 + API 성공 {selected.recoveredRequests}건
+                        </p>
+                        <p>가장 가까운 상위 SERVER 응답입니다. 진입 API 응답과 다를 수 있습니다.</p>
+                      </details>
                     )}
                     {node(selected.target)?.type === 'dependency' && (
                       <div className="flow-boundary">
@@ -451,7 +463,8 @@ export function RequestFlow(p: PageProps) {
                           <th>시간 / 리전</th>
                           <th>호출 결과</th>
                           <th>하위 지연</th>
-                          <th>우리 API 응답</th>
+                          <th>호출 서비스 API</th>
+                          <th>진입 API 응답</th>
                           <th>재전송</th>
                           <th>근거</th>
                         </tr>
@@ -484,6 +497,18 @@ export function RequestFlow(p: PageProps) {
                                 </small>
                               )}
                             </td>
+                            <td>
+                              {e.entryFailed === null
+                                ? '연결 근거 없음'
+                                : e.entryFailed
+                                  ? '실패'
+                                  : '성공'}
+                              {e.entryService && (
+                                <small>
+                                  {e.entryService} / {number(e.entryDurationMs ?? 0, 0)}ms
+                                </small>
+                              )}
+                            </td>
                             <td>{e.resend}</td>
                             <td>
                               <button
@@ -506,10 +531,11 @@ export function RequestFlow(p: PageProps) {
               <p>
                 수집된 SERVER·CLIENT 스팬을 기준으로 계산합니다. 상대 스팬이 있으면 한 번만 세고,
                 없으면 미계측 노드로 표시합니다. 표본 추출·수집 유실·시간창 경계 때문에 상대가 빠질
-                수도 있습니다. 최근 스팬 identity로 중복을 제거하며, 고객 응답 연결은 같은
-                trace·환경 내 최대 16단계의 상위 SERVER를 찾습니다. p95는 이 관측 집합의 실제 순위
-                값이고 전체 고객 트래픽의 p95가 아닙니다. 재전송에는 HTTP redirect도 포함될 수
-                있습니다.
+                수도 있습니다. 최근 스팬 identity로 중복을 제거하며, 응답 연결은 같은 trace·환경 내
+                최대 16단계를 따라 호출 서비스 SERVER와 루트 또는 신뢰된 entry 표시 SERVER를
+                구분합니다. 진입 근거가 없으면 최종 응답을 추정하지 않습니다. p95는 이 관측 집합의
+                실제 순위 값이고 전체 고객 트래픽의 p95가 아닙니다. 재전송에는 HTTP redirect도
+                포함될 수 있습니다.
               </p>
             </details>
             <DependencyRules p={p} data={data} selected={selected} />

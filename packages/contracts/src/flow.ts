@@ -24,6 +24,9 @@ export type FlowEdge = {
   parentRequests: number;
   impactedRequests: number;
   recoveredRequests: number;
+  entryRequests: number;
+  impactedEntries: number;
+  recoveredEntries: number;
   averageMs: number;
   p50Ms: number;
   p95Ms: number;
@@ -48,6 +51,10 @@ export type FlowEvidence = {
   parentDurationMs: number | null;
   parentFailed: boolean | null;
   parentRoute: string | null;
+  entryDurationMs: number | null;
+  entryFailed: boolean | null;
+  entryRoute: string | null;
+  entryService: string | null;
 };
 export type RequestFlow = {
   from: number;

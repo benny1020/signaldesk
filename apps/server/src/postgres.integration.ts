@@ -319,6 +319,9 @@ test('real PostgreSQL storage, concurrency and loss-of-lock acceptance', async (
           {
             ...base,
             id: 'flow-root',
+            parentSpanId: 'unrecorded-caller',
+            attributes: { 'signaldesk.entry': true },
+            status: 'error' as const,
             traceId: 'flow-correlated',
             spanId: 'root',
             spanKind: 'server' as const,
@@ -380,6 +383,8 @@ test('real PostgreSQL storage, concurrency and loss-of-lock acceptance', async (
           assert.deepEqual(canonical(pg), canonical(local));
           assert.equal(pg.edges.find((e) => e.paired)?.count, 1);
           assert.equal(pg.edges.find((e) => e.count === 1101)?.recoveredRequests, 1);
+          assert.equal(pg.edges.find((e) => e.count === 1101)?.impactedEntries, 1);
+          assert.equal(pg.edges.find((e) => e.count === 1101)?.recoveredEntries, 0);
           assert.equal(pg.edges.find((e) => e.count === 1101)?.p95Ms, 1046);
           const monitor = {
             id: 'pg-dependency',

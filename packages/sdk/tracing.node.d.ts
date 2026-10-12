@@ -15,6 +15,7 @@ export class SignalDeskTracing {
       route: string;
       headers?: Headers | { traceparent?: string };
       caller?: string;
+      entry?: boolean;
     },
     fn: (ctx: TraceContext) => Promise<T>,
   ): Promise<T>;

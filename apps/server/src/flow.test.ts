@@ -381,6 +381,8 @@ test('real HTTP caller → gateway → orders → uninstrumented provider correl
     assert.equal(external.count, 2);
     assert.equal(external.errors, 1);
     assert.equal(external.recoveredRequests, 1);
+    assert.equal(external.recoveredEntries, 1);
+    assert.equal(external.impactedEntries, 0);
     assert.equal(external.retries, 1);
     assert.equal(s.query('log', q).items.length, 1);
     const stored = JSON.stringify(s.query('span', q));
@@ -601,6 +603,77 @@ test('dependency API disable and revision change fence an in-flight evaluator; v
     assert.deepEqual(listed.json().statuses, []);
   } finally {
     await app.close();
+    s.close();
+  }
+});
+test('nearest service success is distinct from failed entry API; missing entry remains unknown', async () => {
+  const s = new Store(':memory:');
+  try {
+    s.append('live', [
+      flowFixture({ spanId: 'entry', service: 'public-api', status: 'error' }),
+      flowFixture({
+        spanId: 'internal-call',
+        parentSpanId: 'entry',
+        spanKind: 'client',
+        service: 'public-api',
+      }),
+      flowFixture({ spanId: 'middle', parentSpanId: 'internal-call', service: 'middle-api' }),
+      flowFixture({
+        spanId: 'external',
+        parentSpanId: 'middle',
+        spanKind: 'client',
+        service: 'middle-api',
+        status: 'error',
+        attributes: { 'server.address': 'provider.test' },
+      }),
+      flowFixture({
+        spanId: 'partial-server',
+        traceId: 'partial',
+        parentSpanId: 'missing',
+        service: 'middle-api',
+      }),
+      flowFixture({
+        spanId: 'partial-call',
+        traceId: 'partial',
+        parentSpanId: 'partial-server',
+        spanKind: 'client',
+        service: 'middle-api',
+        status: 'error',
+        attributes: { 'server.address': 'partial.test' },
+      }),
+      flowFixture({
+        spanId: 'trusted-entry',
+        traceId: 'marked',
+        parentSpanId: 'unrecorded-external-client',
+        service: 'public-api',
+        attributes: { 'signaldesk.entry': true },
+      }),
+      flowFixture({
+        spanId: 'marked-call',
+        traceId: 'marked',
+        parentSpanId: 'trusted-entry',
+        spanKind: 'client',
+        service: 'public-api',
+        status: 'error',
+        attributes: { 'server.address': 'marked.test' },
+      }),
+    ]);
+    const d = await requestFlow(s, s, scope),
+      edge = (name: string) =>
+        d.edges.find((e) => d.nodes.find((n) => n.id === e.target)?.name === name)!;
+    assert.equal(edge('provider.test').recoveredRequests, 1);
+    assert.equal(edge('provider.test').recoveredEntries, 0);
+    assert.equal(edge('provider.test').impactedEntries, 1);
+    const detail = await requestFlow(s, s, scope, edge('provider.test').id);
+    assert.equal(detail.evidence[0].parentFailed, false);
+    assert.equal(detail.evidence[0].entryFailed, true);
+    assert.equal(detail.evidence[0].entryService, 'public-api');
+    assert.equal(edge('partial.test').entryRequests, 0);
+    const partial = await requestFlow(s, s, scope, edge('partial.test').id);
+    assert.equal(partial.evidence[0].entryFailed, null);
+    assert.equal(edge('marked.test').entryRequests, 1);
+    assert.equal(edge('marked.test').recoveredEntries, 1);
+  } finally {
     s.close();
   }
 });

@@ -34,7 +34,7 @@ function instrument(t, route, work, caller) {
   return async (req, res) => {
     try {
       const result = await t.server(
-        { method: req.method, route, headers: req.headers, caller },
+        { method: req.method, route, headers: req.headers, caller, entry: Boolean(caller) },
         work,
       );
       res.writeHead(result.status, { 'content-type': 'application/json' });

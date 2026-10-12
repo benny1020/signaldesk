@@ -663,3 +663,18 @@
     transition: none !important;
   }
 }
+
+.flow-local-response {
+  margin: 14px 0;
+  font-size: 12px;
+  color: #62758a;
+  line-height: 1.7;
+}
+.flow-local-response summary {
+  cursor: pointer;
+  color: #315c7e;
+  font-weight: 600;
+}
+.flow-local-response p {
+  margin: 8px 0;
+}

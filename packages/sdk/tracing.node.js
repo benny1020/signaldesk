@@ -34,7 +34,7 @@ export class SignalDeskTracing {
   current() {
     return this.context.getStore() ?? null;
   }
-  async server({ method, route, headers = {}, caller }, fn) {
+  async server({ method, route, headers = {}, caller, entry = false }, fn) {
     if (!route || route.length > 200 || /[?#]/.test(route))
       throw new Error('A stable route template is required');
     const header = headers instanceof Headers ? headers.get('traceparent') : headers.traceparent;
@@ -72,6 +72,7 @@ export class SignalDeskTracing {
               'http.route': route,
               'http.response.status_code': status,
               ...(caller ? { 'signaldesk.caller': String(caller).slice(0, 100) } : {}),
+              ...(entry ? { 'signaldesk.entry': true } : {}),
             },
           });
       }
