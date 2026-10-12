@@ -1,5 +1,13 @@
 # Verification record
 
+## Geographic region overview · 2026-10-13
+
+- Local formatting, TypeScript, 71 automated tests (zero failures/skips) and production build passed. Two new regression tests cover registered versus unregistered geography, stale status, retired-resource exclusion, host/app separation, missing request/error totals and inventory counts beyond the comparison grid's 50-row/12-region cap.
+- Reused the isolated five-region preview on port 4323. Chrome at 1280×1000 and 390×844 displayed the world outline and Asian inset. Seoul, Japan and Singapore labels have separate callouts; mobile retains readable North America/Europe names and stacks the inset. Document width equalled the viewport at both sizes. The Seoul label initially overlapped its pin; its callout was moved and font sizes increased before the final screenshots.
+- Keyboard Enter selected Europe on the SVG map and showed two checkout instances, 25.2 req/s, 0.12% request-weighted errors and maximum instance p95 180ms. Opening request flow retained Demo/service/environment/module/range, set `region=eu-west-1`, reset the old cross-region-only view to all flows and displayed European calls. Selecting Seoul and opening logs retained the same scope, set `region=ap-northeast-2` and returned seven scoped Demo logs. Space selected Seoul in the mobile equivalent region list. No external provider request was made.
+- The map bundle is lazy-loaded on the deployment page, with an offline SVG path derived from a pinned public-domain Natural Earth source. The regeneration script passed the formatting check. Coordinates are representative regional points; custom codes have no inferred geography. This view does not verify physical regional deployments or release/digest equality.
+- Screenshots: [desktop region atlas](screenshots/v04/region-atlas.jpg), [mobile region atlas](screenshots/v04/region-atlas-mobile.jpg). Console warning/error entries were empty during browser acceptance. Source and boundaries: [five-region operating model](FIVE_REGION_OPERATIONS.md#지리-지도와-조사-동선). Pushed-head/container/distributed checks are reported by the [CI workflow](https://github.com/benny1020/signaldesk/actions/workflows/ci.yml).
+
 ## Five-region follow-through · 2026-10-13
 
 - Local `npm run check` passed formatting, TypeScript, 69 tests (zero failures/skips) and the production build. Five new tests cover same-named resources on five independent regional labels, same-service comparison, local/default versus explicit cross-region calls, region-isolated alert firing/recovery, absent/partial telemetry, environment/module boundaries and bounded large-inventory rendering.

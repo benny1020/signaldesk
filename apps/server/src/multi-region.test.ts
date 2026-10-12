@@ -5,7 +5,11 @@ import { seedDemo } from './seed.ts';
 import { dashboard } from './queries.ts';
 import { requestFlow } from './flow.ts';
 import { Engine } from './engine.ts';
-import { exampleRegions, regionalComparison } from '../../../packages/contracts/src/deployments.ts';
+import {
+  exampleRegions,
+  regionalComparison,
+  regionalSummary,
+} from '../../../packages/contracts/src/deployments.ts';
 import { crossesRegion } from '../../../packages/contracts/src/flow.ts';
 import type { ResourceSummary, Metric, Rule } from '../../../packages/contracts/src/index.ts';
 
@@ -68,6 +72,71 @@ const resource = (patch: Partial<ResourceSummary>): ResourceSummary => ({
   errorPct: 1,
   latency: 100,
   ...patch,
+});
+
+test('geographic summaries preserve unknown locations, stale data and incomplete application totals', () => {
+  const summaries = regionalSummary([
+    resource({ region: 'ap-northeast-2', status: 'degraded' }),
+    resource({
+      region: 'ap-northeast-2',
+      instanceId: 'pod-2',
+      requestRate: 10,
+      errorPct: 20,
+      latency: 800,
+    }),
+    resource({
+      region: 'custom-eu',
+      status: 'unknown',
+      requestRate: null,
+      errorPct: null,
+      latency: null,
+    }),
+    resource({ region: 'custom-eu', instanceId: 'pod-3' }),
+    resource({ region: 'retired-region', retired: true }),
+    resource({
+      region: 'ap-northeast-2',
+      service: 'infrastructure',
+      host: 'node-1',
+      requestRate: null,
+      errorPct: null,
+      latency: null,
+    }),
+  ]);
+  assert.equal(summaries.length, 2);
+  const seoul = summaries.find((r) => r.region === 'ap-northeast-2')!;
+  assert.equal(seoul.location?.label, '서울');
+  assert.equal(seoul.resources, 3);
+  assert.equal(seoul.applications, 2);
+  assert.equal(seoul.hosts, 1);
+  assert.equal(seoul.services, 1);
+  assert.equal(seoul.status, 'degraded');
+  assert.equal(seoul.rate, 100);
+  assert.equal(seoul.error, 2.9);
+  assert.equal(seoul.latency, 800);
+  const custom = summaries.find((r) => r.region === 'custom-eu')!;
+  assert.equal(
+    custom.location,
+    undefined,
+    'unregistered codes must not acquire an inferred location',
+  );
+  assert.equal(custom.status, 'unknown');
+  assert.equal(custom.unknown, 1);
+  assert.equal(custom.rate, null);
+  assert.equal(custom.error, null);
+  assert.deepEqual(regionalSummary([]), []);
+});
+
+test('geographic inventory summaries do not inherit the comparison grid caps', () => {
+  const inputs = Array.from({ length: 60 }, (_, i) =>
+    resource({ service: `service-${i}`, region: `custom-${i}` }),
+  );
+  const summaries = regionalSummary(inputs);
+  assert.equal(summaries.length, 60);
+  assert.equal(
+    summaries.reduce((sum, r) => sum + r.resources, 0),
+    inputs.length,
+  );
+  assert.equal(regionalComparison(inputs).regions.length, 12);
 });
 
 test('regional comparison preserves environment/module scope and never treats absent or partial telemetry as healthy totals', () => {

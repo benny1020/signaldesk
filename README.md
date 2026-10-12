@@ -211,7 +211,9 @@ Historical v0.3 manual browser acceptance covers the correlated navigation, aler
 
 The [v0.4 research and design](docs/REQUEST_FLOW_REDESIGN.md) compares OTel, Google Dapper, Uber/Jaeger, AWS, Azure, Tempo and SigNoz using official material and six pinned GitHub source snapshots. Research patterns are implemented in original code; no upstream product assets/code were copied. Current-source research does not assert production feature parity.
 
-The same application can be compared across independent European, North American, Japanese, Singaporean and Seoul deployments. The new Demo uses five locations, local internal calls by default and explicit cross-region examples. Compare service/environment/module rows, open a regional deployment and investigate cross-region calls. [The five-region operating model](docs/FIVE_REGION_OPERATIONS.md) separates implemented behavior from release/digest drift inventory and real geographic resilience work.
+The same application can be compared across independent European, North American, Japanese, Singaporean and Seoul deployments. A geographic overview pairs an offline world map with an Asian inset so nearby regions stay readable. Select a region to inspect its observed status and metrics, then open regional deployments, logs or request flows with the investigation scope preserved. Location markers use representative points, not facility locations; unregistered region codes stay in the equivalent selectable list. The new Demo uses five locations, local internal calls by default and explicit cross-region examples. Compare service/environment/module rows, open a regional deployment and investigate cross-region calls. [The five-region operating model](docs/FIVE_REGION_OPERATIONS.md) separates implemented behavior from release/digest drift inventory and real geographic resilience work.
+
+![Geographic region overview with an Asian inset · Demo](docs/screenshots/v04/region-atlas.jpg)
 
 ![Same service across five regions · Demo, not a geographic deployment](docs/screenshots/v04/five-regions.jpg)
 

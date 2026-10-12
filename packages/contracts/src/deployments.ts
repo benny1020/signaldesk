@@ -2,28 +2,73 @@ import type { ResourceSummary } from './index.ts';
 
 /** Illustrative locations, not an assumed provider or a configured live inventory. */
 export const exampleRegions = [
-  { id: 'eu-west-1', label: '유럽' },
-  { id: 'us-east-1', label: '북미' },
-  { id: 'ap-northeast-1', label: '일본' },
-  { id: 'ap-southeast-1', label: '싱가포르' },
-  { id: 'ap-northeast-2', label: '서울' },
+  { id: 'eu-west-1', label: '유럽', longitude: -6.26, latitude: 53.35 },
+  { id: 'us-east-1', label: '북미', longitude: -78.5, latitude: 38 },
+  { id: 'ap-northeast-1', label: '일본', longitude: 139.69, latitude: 35.68 },
+  { id: 'ap-southeast-1', label: '싱가포르', longitude: 103.82, latitude: 1.35 },
+  { id: 'ap-northeast-2', label: '서울', longitude: 126.98, latitude: 37.57 },
 ] as const;
 
 export function regionLabel(region: string) {
   return exampleRegions.find((r) => r.id === region)?.label ?? region;
 }
 
+export function regionLocation(region: string) {
+  return exampleRegions.find((r) => r.id === region);
+}
+
+function isApplication(r: ResourceSummary) {
+  return !!(
+    r.observedApplication ||
+    !r.host ||
+    r.requestRate !== null ||
+    r.errorPct !== null ||
+    r.latency !== null
+  );
+}
+
+/** Aggregate the actual inventory, independently of the bounded service comparison grid. */
+export function regionalSummary(resources: ResourceSummary[]) {
+  const groups = new Map<string, ResourceSummary[]>();
+  for (const r of resources) {
+    if (r.retired) continue;
+    const rows = groups.get(r.region) ?? [];
+    rows.push(r);
+    groups.set(r.region, rows);
+  }
+  return [...groups].map(([region, rows]) => {
+    const applications = rows.filter(isApplication);
+    const degraded = rows.filter((r) => r.status === 'degraded').length;
+    const unknown = rows.filter((r) => r.status === 'unknown').length;
+    const rate =
+      applications.length && applications.every((r) => r.requestRate !== null)
+        ? applications.reduce((sum, r) => sum + r.requestRate!, 0)
+        : null;
+    const error =
+      rate !== null && rate > 0 && applications.every((r) => r.errorPct !== null)
+        ? applications.reduce((sum, r) => sum + r.requestRate! * r.errorPct!, 0) / rate
+        : null;
+    const latencies = applications.flatMap((r) => (r.latency === null ? [] : [r.latency]));
+    return {
+      region,
+      location: regionLocation(region),
+      resources: rows.length,
+      applications: applications.length,
+      hosts: rows.filter((r) => r.host).length,
+      services: new Set(applications.map((r) => JSON.stringify([r.service, r.environment]))).size,
+      degraded,
+      unknown,
+      status: degraded ? 'degraded' : unknown ? 'unknown' : 'healthy',
+      rate,
+      error,
+      latency: latencies.length ? Math.max(...latencies) : null,
+    };
+  });
+}
+
 /** Keep environment and module boundaries while comparing one service across regions. */
 export function regionalComparison(resources: ResourceSummary[]) {
-  const applications = resources.filter(
-    (r) =>
-      !r.retired &&
-      (r.observedApplication ||
-        !r.host ||
-        r.requestRate !== null ||
-        r.errorPct !== null ||
-        r.latency !== null),
-  );
+  const applications = resources.filter((r) => !r.retired && isApplication(r));
   const allRegions = [...new Set(resources.filter((r) => !r.retired).map((r) => r.region))].sort();
   const regions = allRegions.slice(0, 12);
   const services = new Map<string, ResourceSummary[]>();

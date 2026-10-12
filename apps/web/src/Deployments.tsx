@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { lazy, useState } from 'react';
 import { Globe, ArrowUpRight } from 'lucide-react';
 import type { ResourceSummary } from '../../../packages/contracts/src/index';
 import { regionalComparison, regionLabel } from '../../../packages/contracts/src/deployments';
 import { Panel, Badge, number, Empty, Chart, ChartBoundary, time } from './components';
 import type { PageProps } from './Pages';
+const RegionMap = lazy(() => import('./maps/RegionMap').then((m) => ({ default: m.RegionMap })));
 export const resourceLabels = {
   region: '리전',
   module: '모듈',
@@ -162,6 +163,9 @@ export function Deployments(p: PageProps) {
           않습니다.
         </p>
       </div>
+      <ChartBoundary>
+        <RegionMap resources={resources} p={p} />
+      </ChartBoundary>
       <Panel
         title="같은 서비스의 리전별 상태"
         meta="서비스·환경·모듈을 맞춰 비교합니다. 같은 형상이라도 리전별 상태는 다를 수 있습니다."
