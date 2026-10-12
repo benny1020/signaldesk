@@ -3,11 +3,13 @@ import {
   type QueryScope,
   type AggregateKind,
 } from '../../../packages/contracts/src/index.ts';
+import { flowSQL } from './flow-sql.ts';
 export function aggregateSQL(
   kind: AggregateKind,
   scope: QueryScope & { route?: string; latencyMs?: number },
   postgres: boolean,
 ) {
+  if (kind.startsWith('flow')) return flowSQL(kind, scope, postgres);
   const values: unknown[] = [];
   const param = (v: unknown) => {
     values.push(v);
@@ -42,7 +44,8 @@ export function aggregateSQL(
   );
   const bucket = `CAST(time / ${stepMs} AS ${postgres ? 'bigint' : 'INTEGER'}) * ${stepMs}`;
   const route = `coalesce(${attr('http.route')},${field('name')},'unknown')`;
-  const isServer = `(coalesce(${attr('span.kind')},'')='server' OR coalesce(${field('parentSpanId')},'')='')`;
+  const spanKind = `lower(coalesce(${field('spanKind')},${attr('span.kind')},'unknown'))`;
+  const isServer = `(${spanKind}='server' OR (${spanKind}='unknown' AND coalesce(${field('parentSpanId')},'')=''))`;
   if (scope.route && !['metricSeries', 'logBuckets', 'errorGroups'].includes(kind))
     condition.push(route + '=' + param(scope.route));
   if (kind === 'metricSeries') {

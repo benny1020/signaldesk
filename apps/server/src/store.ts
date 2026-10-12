@@ -34,7 +34,7 @@ export interface TelemetryStore {
   latestMetrics?(scope: QueryScope): Page<Metric> | Promise<Page<Metric>>;
 }
 const forbidden =
-  /authorization|password|secret|token(?!s)|api.?key|prompt|completion|input.messages|output.messages|system.instructions|tool.call.(arguments|result)/i;
+  /authorization|password|secret|token(?!s)|api.?key|prompt|completion|input.messages|output.messages|system.instructions|tool.call.(arguments|result)|cookie|baggage|http\.(request|response)\.(header|body)|^url\.(full|query|path)$|^http\.(url|target)$/i;
 export function redact(text: string): string {
   return text
     .replace(/Bearer\s+[\w.\-]+/gi, 'Bearer [redacted]')

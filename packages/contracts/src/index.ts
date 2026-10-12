@@ -97,6 +97,7 @@ export const logSchema = z.object({
 export const spanSchema = z.object({
   ...base,
   kind: z.literal('span'),
+  spanKind: z.enum(['internal', 'server', 'client', 'producer', 'consumer']).optional(),
   traceId: z.string().min(1).max(128),
   spanId: z.string().min(1).max(128),
   parentSpanId: z.string().max(128).optional(),
@@ -167,6 +168,8 @@ export type Rule = RuleInput & {
   revision?: number;
 };
 export type Alert = ResourceSelector & {
+  dependency?: string;
+  dependencyRoute?: string;
   groupKey?: string;
   id: string;
   workspace: Workspace;
@@ -217,6 +220,7 @@ export type QueryScope = ResourceSelector & {
   metric?: Metric['name'];
   route?: string;
   eventId?: string;
+  flowFilter?: string[];
 };
 export type Page<T> = { items: T[]; nextCursor: string | null; truncated: boolean };
 export type Series = {
@@ -300,3 +304,4 @@ export type Dashboard = {
 };
 
 export * from './operations.ts';
+export * from './flow.ts';

@@ -280,13 +280,32 @@ export function TraceWaterfall({
         <div className="waterfall-row" key={s.spanId}>
           <div className="span-name" style={{ paddingLeft: depth(s) * 14 }}>
             <strong>{s.name}</strong>
+            <small>
+              {String(s.spanKind ?? s.attributes?.['span.kind'] ?? 'unknown').toUpperCase()}
+              {s.attributes?.['http.response.status_code']
+                ? ' / HTTP ' + s.attributes['http.response.status_code']
+                : ''}
+              {s.attributes?.['http.request.resend_count']
+                ? ' / 재전송 ' + s.attributes['http.request.resend_count']
+                : ''}
+              {s.attributes?.['error.type'] ? ' / ' + s.attributes['error.type'] : ''}
+            </small>
             <button className="text-button" onClick={() => onService?.(s)}>
               {s.service} / {s.region ?? '미지정'}
             </button>
           </div>
           <div className="waterfall-track">
             <div
-              className={'waterfall-bar ' + (s.status === 'error' ? 'failed' : '')}
+              className={
+                'waterfall-bar ' +
+                (s.status === 'error' ||
+                Number(
+                  s.attributes?.['http.response.status_code'] ?? s.attributes?.['http.status_code'],
+                ) >=
+                  (s.spanKind === 'client' || s.attributes?.['span.kind'] === 'client' ? 400 : 500)
+                  ? 'failed'
+                  : '')
+              }
               style={{
                 left: (100 * (s.timestamp - start)) / duration + '%',
                 width: Math.max(1, (100 * s.durationMs) / duration) + '%',

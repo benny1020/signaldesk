@@ -48,3 +48,9 @@ Operators can identify a service owner/runbook, compare API failure groups, open
 AI version summaries and candidate evaluation are primary. Individual token/call evidence is revealed on demand rather than duplicating an uncapped-looking summary. External analysis is a configured explicit opt-in operation; local facts, supporting/counter/missing evidence and next checks remain the default. Relationships show observed edges and equivalent tables; an absent edge is unknown, not proof of no dependency.
 
 [Redesign](REDESIGN.md) and [verification](VERIFICATION.md) track implemented acceptance. Browser checks establish task behavior under Demo fixtures; real operators and measured completion time/error rates remain a product gate.
+
+## v0.4 request investigation
+
+The default workspace follows caller → our API → internal/external dependency. Selecting a connection answers: how many attempts were observed, how slow were they, what failed or was throttled/timed out, were both sides instrumented, and what did the nearest parent API return? A latency distribution and ranked trace evidence lead into existing log/trace/alert/incident actions. Dependencies without counterpart telemetry are visually distinct and have no asserted provider-wide health. Service grouping and region expansion preserve the underlying route/regional numbers.
+
+A dependency rule starts from the selected outgoing connection, with minimum observations, revision, status freshness and existing notification lifecycle. The numeric connection list is a parallel investigation path. Graph caps, sample limits, missing data and maximum-route p95 labels are visible. Fresh desktop/mobile usability and accessibility acceptance is pending host unlock; implementation and automated backend correctness do not prove visual acceptance.

@@ -1,0 +1,164 @@
+{
+  "verifiedAt": "2026-10-12",
+  "items": [
+    {
+      "repository": "open-telemetry/opentelemetry-collector-contrib",
+      "commit": "7be474ae4e2a7612b126ecb1435c36de64b00d87",
+      "license": "Apache-2.0",
+      "sourceCandidates": [
+        "connector/servicegraphconnector/Makefile",
+        "connector/servicegraphconnector/README.md",
+        "connector/servicegraphconnector/config.go",
+        "connector/servicegraphconnector/config.schema.yaml",
+        "connector/servicegraphconnector/config_test.go",
+        "connector/servicegraphconnector/connector.go",
+        "connector/servicegraphconnector/connector_test.go",
+        "connector/servicegraphconnector/documentation.md",
+        "connector/servicegraphconnector/factory.go",
+        "connector/servicegraphconnector/factory_test.go",
+        "connector/servicegraphconnector/generated_component_test.go",
+        "connector/servicegraphconnector/generated_package_test.go"
+      ],
+      "readFiles": [
+        {
+          "path": "connector/servicegraphconnector/connector.go",
+          "sha256": "5cfd2b97e5d1425a472a517fca0f13392a50f80c1b635120a81876a3943bf3e2",
+          "bytes": 29401,
+          "url": "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/7be474ae4e2a7612b126ecb1435c36de64b00d87/connector/servicegraphconnector/connector.go"
+        },
+        {
+          "path": "connector/servicegraphconnector/README.md",
+          "sha256": "7ddf2f0ed2d9dd42fd63c334e035894d95c48bbdc6444b038be2209751f8f5e4",
+          "bytes": 11430,
+          "url": "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/7be474ae4e2a7612b126ecb1435c36de64b00d87/connector/servicegraphconnector/README.md"
+        },
+        {
+          "path": "connector/spanmetricsconnector/README.md",
+          "sha256": "ae95c2ce1a969b37676b069c588782d5f6247e25a24d962986ba8514b7cd88a6",
+          "bytes": 27540,
+          "url": "https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/7be474ae4e2a7612b126ecb1435c36de64b00d87/connector/spanmetricsconnector/README.md"
+        }
+      ]
+    },
+    {
+      "repository": "grafana/tempo",
+      "commit": "51304f345afb4c5f5acb458e91e762c97736dd82",
+      "license": "AGPL-3.0",
+      "sourceCandidates": [
+        "modules/generator/processor/servicegraphs/config.go",
+        "modules/generator/processor/servicegraphs/servicegraphs.go",
+        "modules/generator/processor/servicegraphs/servicegraphs_benchmark_test.go",
+        "modules/generator/processor/servicegraphs/servicegraphs_test.go",
+        "modules/generator/processor/servicegraphs/store/edge.go",
+        "modules/generator/processor/servicegraphs/store/interface.go",
+        "modules/generator/processor/servicegraphs/store/store.go",
+        "modules/generator/processor/servicegraphs/store/store_test.go",
+        "modules/generator/processor/servicegraphs/subprocessors.go",
+        "modules/generator/processor/servicegraphs/subprocessors_test.go",
+        "modules/generator/processor/servicegraphs/testdata/trace-with-both-db-attributes.json",
+        "modules/generator/processor/servicegraphs/testdata/trace-with-db-namespace.json"
+      ],
+      "readFiles": [
+        {
+          "path": "modules/generator/processor/servicegraphs/servicegraphs.go",
+          "sha256": "ce844a380bc32d111a443ac3731bbdc1af59934f996b32a71408fa4ed278dbaf",
+          "bytes": 20497,
+          "url": "https://github.com/grafana/tempo/blob/51304f345afb4c5f5acb458e91e762c97736dd82/modules/generator/processor/servicegraphs/servicegraphs.go"
+        },
+        {
+          "path": "modules/generator/processor/servicegraphs/config.go",
+          "sha256": "b6803a70e1aaf7df0c29d1262ad3c0d4c87e47e6d730c8d342647a140951b69d",
+          "bytes": 4484,
+          "url": "https://github.com/grafana/tempo/blob/51304f345afb4c5f5acb458e91e762c97736dd82/modules/generator/processor/servicegraphs/config.go"
+        }
+      ]
+    },
+    {
+      "repository": "jaegertracing/jaeger-ui",
+      "commit": "a55f771095894f30dade4497c930de533575bc18",
+      "license": "Apache-2.0",
+      "sourceCandidates": [
+        "packages/jaeger-ui/src/components/Monitor/ServicesView/serviceGraph.css",
+        "packages/jaeger-ui/src/components/Monitor/ServicesView/serviceGraph.test.jsx",
+        "packages/jaeger-ui/src/components/Monitor/ServicesView/serviceGraph.tsx",
+        "packages/jaeger-ui/src/components/SearchTracePage/FileLoader.css",
+        "packages/jaeger-ui/src/components/SearchTracePage/FileLoader.test.jsx",
+        "packages/jaeger-ui/src/components/SearchTracePage/FileLoader.tsx",
+        "packages/jaeger-ui/src/components/SearchTracePage/SearchForm.css",
+        "packages/jaeger-ui/src/components/SearchTracePage/SearchForm.markers.ts",
+        "packages/jaeger-ui/src/components/SearchTracePage/SearchForm.test.jsx",
+        "packages/jaeger-ui/src/components/SearchTracePage/SearchForm.track.test.js",
+        "packages/jaeger-ui/src/components/SearchTracePage/SearchForm.track.ts",
+        "packages/jaeger-ui/src/components/SearchTracePage/SearchForm.tsx"
+      ],
+      "readFiles": [
+        {
+          "path": "packages/jaeger-ui/src/components/Monitor/ServicesView/serviceGraph.tsx",
+          "sha256": "f1392b518db7b1959ad7d08fb350be1057eb0ad1ce257a0b9c98cfd1a76f90d2",
+          "bytes": 8943,
+          "url": "https://github.com/jaegertracing/jaeger-ui/blob/a55f771095894f30dade4497c930de533575bc18/packages/jaeger-ui/src/components/Monitor/ServicesView/serviceGraph.tsx"
+        }
+      ]
+    },
+    {
+      "repository": "SigNoz/signoz",
+      "commit": "785c2e219587d320be4d7516c4c85da82023c384",
+      "license": "NOASSERTION",
+      "sourceCandidates": ["frontend/src/assets/Logos/external-api-monitoring.svg"],
+      "readFiles": [
+        {
+          "path": "LICENSE",
+          "sha256": "449417bc4e96c1787726c58de4b846b2d5146076e4a0a82a2093452ec0882abf",
+          "bytes": 1589,
+          "url": "https://github.com/SigNoz/signoz/blob/785c2e219587d320be4d7516c4c85da82023c384/LICENSE"
+        },
+        {
+          "path": "frontend/src/modules/Servicemap/Map.tsx",
+          "sha256": "265506455300628cd9e1c1abd82d2dd97a908ccd98d7a4c39941ea3b712bca11",
+          "bytes": 1668,
+          "url": "https://github.com/SigNoz/signoz/blob/785c2e219587d320be4d7516c4c85da82023c384/frontend/src/modules/Servicemap/Map.tsx"
+        },
+        {
+          "path": "frontend/src/modules/Servicemap/ServiceMap.tsx",
+          "sha256": "78186b374c764ee778379d1bed3ca455962149e89f4c47c39849eda64de93e99",
+          "bytes": 3264,
+          "url": "https://github.com/SigNoz/signoz/blob/785c2e219587d320be4d7516c4c85da82023c384/frontend/src/modules/Servicemap/ServiceMap.tsx"
+        }
+      ]
+    },
+    {
+      "repository": "xyflow/xyflow",
+      "commit": "3d35b57317576b0916c0bfeaaedd573aaacc2839",
+      "license": "MIT",
+      "sourceCandidates": ["packages/react/src/container/ZoomPane/index.tsx"],
+      "readFiles": [
+        {
+          "path": "packages/react/src/container/ZoomPane/index.tsx",
+          "sha256": "5ea0f8cb2a7e574fb14b09f96bf649dfd5656326b55d2200d68e695aef018f73",
+          "bytes": 4458,
+          "url": "https://github.com/xyflow/xyflow/blob/3d35b57317576b0916c0bfeaaedd573aaacc2839/packages/react/src/container/ZoomPane/index.tsx"
+        }
+      ]
+    },
+    {
+      "repository": "kieler/elkjs",
+      "commit": "720f63d90b97361f93030573e2370097b68be1e8",
+      "license": "NOASSERTION",
+      "sourceCandidates": [],
+      "readFiles": [
+        {
+          "path": "README.md",
+          "sha256": "b2d1f5d457f07b28356f400b6600ea62f5239f0d0db51b23933d4aa47711d95c",
+          "bytes": 16160,
+          "url": "https://github.com/kieler/elkjs/blob/720f63d90b97361f93030573e2370097b68be1e8/README.md"
+        },
+        {
+          "path": "LICENSE.md",
+          "sha256": "637e81f4a1b6b4079535c499fca05e238cf7605c1ff5b76d60d7da7ce96700c9",
+          "bytes": 14443,
+          "url": "https://github.com/kieler/elkjs/blob/720f63d90b97361f93030573e2370097b68be1e8/LICENSE.md"
+        }
+      ]
+    }
+  ]
+}

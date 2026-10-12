@@ -104,7 +104,7 @@ export class DurableSignalDeskClient extends SignalDeskClient {
       Object.fromEntries(
         Object.entries(event.attributes).filter(
           ([k]) =>
-            !/authorization|password|secret|api.?key|prompt|completion|token(?!s)|tool.call.(arguments|result)/i.test(
+            !/authorization|password|secret|api.?key|prompt|completion|token(?!s)|tool.call.(arguments|result)|cookie|baggage|http\.(request|response)\.(header|body)|url\.(full|query|path)|http\.(url|target)/i.test(
               k,
             ),
         ),

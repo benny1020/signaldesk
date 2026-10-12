@@ -10,6 +10,7 @@ import {
   sloSchema,
   datasetSchema,
   experimentSchema,
+  dependencyMonitorSchema,
   type Workspace,
   type QueryScope,
   type Team,
@@ -183,12 +184,18 @@ export function registerOperations(
     ['notification-routes', 'notification-route', routeSchema],
     ['maintenance', 'maintenance', maintenanceSchema],
     ['slos', 'slo', sloSchema],
+    ['dependency-monitors', 'dependency-monitor', dependencyMonitorSchema],
     ['evaluation/datasets', 'evaluation-dataset', datasetSchema],
   ] as const;
   for (const [path, kind, schema] of controls) {
     app.get('/api/' + path, async (req) => {
       const q = await scope(req);
-      return { items: await store.list(kind, q.workspace) };
+      return {
+        items: await store.list(kind, q.workspace),
+        ...(kind === 'dependency-monitor'
+          ? { statuses: await store.list('dependency-status', q.workspace), observedAt: Date.now() }
+          : {}),
+      };
     });
     for (const method of ['POST', 'PATCH'] as const)
       app.route({
@@ -203,7 +210,11 @@ export function registerOperations(
               ? await store.get<{ createdAt: number; revision: number }>(kind, id, q.workspace)
               : null;
           if (method === 'PATCH' && !old) throw fail('Item not found', 404);
-          if (method === 'POST' && (await store.list(kind, q.workspace)).length >= 1000)
+          if (
+            method === 'POST' &&
+            (await store.list(kind, q.workspace)).length >=
+              (kind === 'dependency-monitor' ? 50 : 1000)
+          )
             throw fail('Control entity limit reached', 507);
           if (kind === 'evaluation-dataset' && old) {
             const existing = await store.get<EvaluationDataset>(kind, id, q.workspace);
@@ -246,8 +257,11 @@ export function registerOperations(
             ...(kind === 'maintenance' ? { actor: actor(req, q.workspace) } : {}),
           };
           await store.put(kind, entity);
-          if (kind === 'slo' && input.enabled === false)
-            for (const alert of await store.alerts(q.workspace, 'slo:' + id)) {
+          if ((kind === 'slo' || kind === 'dependency-monitor') && input.enabled === false)
+            for (const alert of await store.alerts(
+              q.workspace,
+              (kind === 'slo' ? 'slo:' : 'dependency:') + id,
+            )) {
               alert.status = 'resolved';
               alert.resolvedAt = time;
               const plan = await notificationPlan(store, alert, time, true);

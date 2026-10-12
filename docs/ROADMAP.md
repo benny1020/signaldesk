@@ -21,3 +21,9 @@ Updated 2026-10-10 for v0.3. [Redesign](REDESIGN.md) records the implemented res
 | Access                    | Workspace admin/viewer/ingest tokens, privacy filtering, exact proxy trust                                                                                 | SSO, provisioning, managed org/projects, independent role review                                                      |
 
 Use [verification](VERIFICATION.md), [operations](OPERATIONS.md) and [regional deployment gates](MULTI_REGION.md) before an operating rollout. No production infrastructure, notification recipient or model provider was provisioned by this task.
+
+## v0.4 remaining gates
+
+Implemented: explicit boundary spans, request map, route heatmap, pairing/dedup, customer-response correlation, observed dependency rules, local executable HTTP example and SQLite/PostgreSQL parity. Remaining acceptance: fresh desktop/mobile map/heatmap/keyboard/drilldown validation once the host can be unlocked; real-service instrumentation and propagation across queues/async libraries; high-cardinality/concurrent SQL plans; pre-sampling RED metric adapters; production timeout/retry/circuit-breaker failure drills; geographic HA and exporter coverage.
+
+AI next step: use selected flow facts as cited investigation evidence (retry growth, dependency timeout, correlated customer failures, missing counterpart coverage). Require source links and distinguish observation from hypothesis. Flow-based AI root-cause inference, critical-path/self-time algorithms and automatic remediation are not implemented in v0.4. Overlapping child durations must never be naively summed into parent critical path.

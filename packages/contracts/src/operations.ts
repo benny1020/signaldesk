@@ -150,7 +150,18 @@ export type EvaluationRun = Entity &
     regression: number | null;
   };
 export type AggregateKind =
-  'logBuckets' | 'errorGroups' | 'apis' | 'sli' | 'ai' | 'relations' | 'metricSeries' | 'traces';
+  | 'logBuckets'
+  | 'errorGroups'
+  | 'apis'
+  | 'sli'
+  | 'ai'
+  | 'relations'
+  | 'metricSeries'
+  | 'traces'
+  | 'flowEdges'
+  | 'flowBuckets'
+  | 'flowHistogram'
+  | 'flowEvidence';
 export type AggregateResult = {
   rows: Record<string, string | number | null>[];
   truncated: boolean;

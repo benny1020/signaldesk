@@ -1,4 +1,5 @@
 import { diagnosis, type DiagnosisProvider } from './diagnosis.ts';
+import { requestFlow } from './flow.ts';
 import { otlpLogs, otlpMetrics } from './otlp.ts';
 import { registerOperations } from './operations.ts';
 import Fastify, { type FastifyRequest } from 'fastify';
@@ -250,7 +251,7 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
       mode: config.mode,
       workspace: w,
       demoNow: Number((await store.setting('demoNow')) ?? Date.now()),
-      version: '0.3.0',
+      version: '0.4.0',
       diagnosisDestination: config.diagnosisProvider?.name ?? null,
       capabilities: {
         nativeJson: true,
@@ -287,6 +288,15 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
     return { id, retired };
   });
   app.get('/api/dashboard', async (req) => dashboard(store, await scope(req), telemetry));
+  app.get('/api/request-flow', async (req) => {
+    const q = await scope(req);
+    const edge = z
+      .string()
+      .regex(/^[a-f0-9]{24}$/)
+      .optional()
+      .parse((req.query as { edge?: string }).edge);
+    return requestFlow(store, telemetry, q, edge);
+  });
   app.post('/api/diagnosis', async (req) => {
     const q = await scope(req, 'write');
     const external = z.object({ external: z.boolean().default(false) }).parse(req.body).external;
@@ -405,7 +415,7 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
                         spanId: z.string(),
                         parentSpanId: z.string().optional(),
                         name: z.string(),
-                        kind: z.number().optional(),
+                        kind: z.number().int().min(0).max(5).optional(),
                         startTimeUnixNano: z.string().regex(/^\d+$/),
                         endTimeUnixNano: z.string().regex(/^\d+$/),
                         attributes: z.array(attr).optional(),
@@ -456,7 +466,19 @@ export async function createApp(store: Storage, config: Config, telemetry: Telem
             host: resource['host.id'] ?? resource['host.name'],
             environment: String(resource['deployment.environment.name'] ?? 'production'),
             status: s.status?.code === 2 ? 'error' : 'ok',
-            attributes: { ...attributes, ...(s.kind === 2 ? { 'span.kind': 'server' } : {}) },
+            spanKind: (['internal', 'server', 'client', 'producer', 'consumer'] as const)[
+              (s.kind ?? 0) - 1
+            ],
+            attributes: {
+              ...attributes,
+              ...((s.kind ?? 0) >= 1 && (s.kind ?? 0) <= 5
+                ? {
+                    'span.kind': ['internal', 'server', 'client', 'producer', 'consumer'][
+                      (s.kind ?? 0) - 1
+                    ],
+                  }
+                : {}),
+            },
             ...(get('gen_ai.request.model') &&
             get('gen_ai.usage.input_tokens') !== undefined &&
             get('gen_ai.usage.output_tokens') !== undefined

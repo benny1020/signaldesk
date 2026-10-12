@@ -2,7 +2,7 @@
 
 # SignalDesk
 
-**An operations workspace that connects signals to decisions.**
+**Follow a customer request through your APIs and dependencies.**
 
 Servers · APIs · Logs · Traces · Alerts · Incidents · AI workloads
 
@@ -11,40 +11,52 @@ Servers · APIs · Logs · Traces · Alerts · Incidents · AI workloads
 ![Node 24+](https://img.shields.io/badge/node-24%2B-527eaa)
 ![ECharts 6.1](https://img.shields.io/badge/ECharts-6.1-2869d8)
 
-[Quick start](#quick-start) · [Features](#features) · [Architecture](docs/ARCHITECTURE.md) · [Research](docs/RESEARCH.md) · [한국어](README.ko.md)
+[Quick start](#quick-start) · [Features](#features) · [Architecture](docs/ARCHITECTURE.md) · [Request-flow research](docs/REQUEST_FLOW_REDESIGN.md) · [Research](docs/RESEARCH.md) · [한국어](README.ko.md)
 
 </div>
 
-![SignalDesk overview with correlated service signals and incident context](docs/screenshots/v03/overview.png)
+```mermaid
+flowchart LR
+  Caller[External clients] --> Gateway[Our gateway / SERVER]
+  Gateway --> API[Our API / CLIENT + SERVER]
+  API --> Provider[External API / CLIENT observation]
+  API --> Database[Database / CLIENT observation]
+```
+
+A dependency retry can fail while the final customer response succeeds. SignalDesk connects both outcomes without treating an unobserved provider as healthy.
 
 SignalDesk is a self-hosted monitoring and incident workspace for engineers who need to move from a service symptom to logs, a request trace, an alert, and an incident timeline without losing context. It pairs a dense, readable interface with a working ingestion API, persistent storage and background evaluation.
 
-**Release status: v0.3 investigation workspace / internal pilot.** Shared PostgreSQL API/worker execution, full retained SQL analysis, service ownership, SLOs, policy-based notifications and versioned AI evaluation are implemented. Demo and Live are separate. Production volume, geographic failover and external model accuracy require deployment evidence; see [verification](docs/VERIFICATION.md) and [redesign decisions](docs/REDESIGN.md).
+**Release status: v0.4 request-flow workspace / internal pilot.** CLIENT/SERVER pairing, observed request/attempt percentiles, regional request maps, dependency rules, shared PostgreSQL API/worker execution, service ownership, SLOs, notifications and AI evaluation are implemented. Fresh v0.4 desktop/mobile visual acceptance is pending because the verification host is locked; existing screenshots below are historical v0.3 examples. Demo and Live are separate. Production volume, geographic failover and external model accuracy require deployment evidence; see [verification](docs/VERIFICATION.md) and [redesign decisions](docs/REDESIGN.md).
 
 ## Features
 
-| Workspace       | Implemented behavior                                                                                                                                        |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Deployments     | Regional comparison, per-resource inventory, six shared deployment filters, instance drilldown and explicit retirement/resume                               |
-| Overview        | Shared environment/service/time filters, request rate, request-weighted error percentage, maximum service p95, incident context and actionable service rows |
-| Services & APIs | RED signals, full retained endpoint counts/errors/average/max latency, exact resource drilldown and partial trace discovery                                 |
-| Infrastructure  | Real local CPU and OS memory collection every 5 seconds, timestamped host measurements; JSON ingestion for external hosts                                   |
-| Logs            | Message/level search, virtualized rows, stable keyset pagination, JSON export, attributes and trace linking                                                 |
-| Traces          | Indexed trace lookup, parent/child waterfall, duration, status and span attributes                                                                          |
-| Alerts          | Resource/region/service rule groups, group-aware preview, independent duration/recovery/no-data, acknowledgment and snooze                                  |
-| Notifications   | Owner/dimension routing, policy preview, maintenance, separate firing/repeat/recovery receipts, retries and delivery health                                 |
-| Incidents       | Independent states, owners, multiple linked alerts and persistent investigation notes/timeline                                                              |
-| Analytics       | Full retained log histogram/heatmap, service/environment/code/message error identities, source-backed relationship view                                     |
-| AI workloads    | Provider/model, token usage, reported cost with provenance, TTFT, AI latency and evaluation source/version; trace-linked evidence                           |
-| Operations      | Region-selected synthetic checks, platform/outbox/worker health, scoped roles, bounded capacity and audit trail                                             |
-| Catalog         | Stable service/team IDs, aliases, ownership, repository/runbook links, criticality, regions and orphan discovery                                            |
-| Service levels  | Revisioned availability/latency definitions, observed-span denominator, minimum coverage, error budget and burn alerts                                      |
-| AI evaluations  | Versioned structured datasets, candidate results, pinned baseline, exact-match scores/coverage/regressions, opt-in evidence gateway                         |
+| Workspace         | Implemented behavior                                                                                                                                                    |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Request flow      | Caller → our services → dependencies; paired spans counted once, region/module expansion, observed p50/p95, timeout/429/retransmission and correlated final API outcome |
+| Dependency rules  | Source/target/route-specific error percentage or p95, minimum evidence, unknown/stale status, multiple-worker locks and existing notification lifecycle                 |
+| Deployments       | Regional comparison, per-resource inventory, six shared deployment filters, instance drilldown and explicit retirement/resume                                           |
+| Operating metrics | Shared environment/service/time filters, request rate, request-weighted error percentage, maximum service p95, incident context and actionable service rows             |
+| Services & APIs   | RED signals, full retained endpoint counts/errors/average/max latency, exact resource drilldown and partial trace discovery                                             |
+| Infrastructure    | Real local CPU and OS memory collection every 5 seconds, timestamped host measurements; JSON ingestion for external hosts                                               |
+| Logs              | Message/level search, virtualized rows, stable keyset pagination, JSON export, attributes and trace linking                                                             |
+| Traces            | Indexed trace lookup, parent/child waterfall, duration, status and span attributes                                                                                      |
+| Alerts            | Resource/region/service rule groups, group-aware preview, independent duration/recovery/no-data, acknowledgment and snooze                                              |
+| Notifications     | Owner/dimension routing, policy preview, maintenance, separate firing/repeat/recovery receipts, retries and delivery health                                             |
+| Incidents         | Independent states, owners, multiple linked alerts and persistent investigation notes/timeline                                                                          |
+| Analytics         | Full retained log histogram/heatmap, service/environment/code/message error identities, source-backed relationship view                                                 |
+| AI workloads      | Provider/model, token usage, reported cost with provenance, TTFT, AI latency and evaluation source/version; trace-linked evidence                                       |
+| Operations        | Region-selected synthetic checks, platform/outbox/worker health, scoped roles, bounded capacity and audit trail                                                         |
+| Catalog           | Stable service/team IDs, aliases, ownership, repository/runbook links, criticality, regions and orphan discovery                                                        |
+| Service levels    | Revisioned availability/latency definitions, observed-span denominator, minimum coverage, error budget and burn alerts                                                  |
+| AI evaluations    | Versioned structured datasets, candidate results, pinned baseline, exact-match scores/coverage/regressions, opt-in evidence gateway                                     |
 
-Charts use modular **Apache ECharts 6.1**, with shared investigation range selection, missing-data gaps, series toggles, explicit units, CSV and numeric table alternatives. Absolute UTC bounds, KST/UTC display, saved views and detail URL restoration carry the investigation context. Logs use **TanStack Virtual** and paged server queries. React Query coordinates polling and invalidation. Reduced motion, native modal focus handling and small-screen layouts are included.
+The primary map uses **React Flow 12.12 + ELK 0.12** with layout in a lazy Web Worker, a disclosed graph cap and equivalent numeric connections. Selected connections show an **ECharts latency distribution heatmap** with real bin counts and empty gaps. Charts use modular **Apache ECharts 6.1**, with shared investigation range selection, missing-data gaps, series toggles, explicit units, CSV and numeric table alternatives. Absolute UTC bounds, KST/UTC display, saved views and detail URL restoration carry the investigation context. Logs use **TanStack Virtual** and paged server queries. React Query coordinates polling and invalidation. Reduced motion, native modal focus handling and small-screen layouts are included.
 
 <details>
-<summary>More screens: infrastructure, cross-region trace, AI workloads and mobile</summary>
+<summary>Historical v0.3 screens: not fresh v0.4 visual acceptance</summary>
+
+![Previous v0.3 overview](docs/screenshots/v03/overview.png)
 
 ![Infrastructure signals](docs/screenshots/infrastructure.png)
 ![Cross-region request waterfall](docs/screenshots/cross-region-trace.png)
@@ -70,11 +82,12 @@ Open **http://127.0.0.1:4319**. Local mode binds loopback without a token. A see
 Send real sample events from the included producer:
 
 ```bash
+node examples/request-flow.mjs
 node examples/send-sample.mjs
 node examples/ai-span.mjs
 ```
 
-These examples send explicitly named `example-*` services to Live. They do not instrument your existing servers automatically. The AI example makes no model call and reports no fabricated cost.
+The request-flow example makes actual loopback HTTP calls through two instrumented services to a simulated uninstrumented provider, then uploads CLIENT/SERVER spans and linked logs. [Instrumentation guide](docs/REQUEST_FLOW_INSTRUMENTATION.md) covers production OTel, propagation, redaction, sampling and boundaries. These examples send explicitly named `example-*` services to Live. They do not instrument your existing servers automatically. The AI example makes no model call and reports no fabricated cost.
 
 ### Development
 
@@ -188,7 +201,9 @@ For new installations only: generating `.env` again rotates credentials and the 
 
 The distributed test creates isolated PostgreSQL and application containers, then removes its containers, volumes and temporary credentials.
 
-Manual browser acceptance covers the correlated navigation, alert actions, rule preview/create, incident notes/status, numeric chart view, AI workspace, real local collection and desktop/mobile rendering. [Verification record](docs/VERIFICATION.md) states what was actually executed and any remaining limits.
+Historical v0.3 manual browser acceptance covers the correlated navigation, alert actions, rule preview/create, incident notes/status, numeric chart view, AI workspace, real local collection and desktop/mobile rendering. [Verification record](docs/VERIFICATION.md) states what was actually executed and any remaining limits.
+
+The [v0.4 research and design](docs/REQUEST_FLOW_REDESIGN.md) compares OTel, Google Dapper, Uber/Jaeger, AWS, Azure, Tempo and SigNoz using official material and six pinned GitHub source snapshots. Research patterns are implemented in original code; no upstream product assets/code were copied. Current-source research does not assert production feature parity.
 
 ## Operational limits
 
@@ -197,6 +212,7 @@ The [2026-10-09 OSS comparison review](docs/OSS_COMPARISON_REVIEW.md) identified
 The [2026-10-10 Daangn and Toss research](docs/DAANGN_TOSS_RESEARCH.md) reviews official monitoring, notification, ownership, multi-cluster, SLI, UX and AI operations material, including seven presentation PDFs and six pinned GitHub repositories. The implemented follow-through and remaining limits are tracked in the [redesign record](docs/REDESIGN.md).
 
 - PostgreSQL supports multiple API/worker processes; a primary database remains the write authority. Regional active-active databases and managed HA failover are not implemented by the app.
+- Request-flow measurements describe retained observed spans. Pre-sampling RED metrics and dedicated high-volume trace/metric adapters remain planned. SQL rank percentiles are exact within the observed set; map labels use maximum route p95. A missing receiver can reflect sampling or loss, not only an external service.
 - Seven-day retention; default 1,000,000-event ceiling, configurable with `MAX_EVENTS`. Capacity exhaustion rejects ingestion explicitly. Resource registry defaults to 20,000 identities/workspace (`MAX_RESOURCES`). Control entities also have limits.
 - Detail samples cap at 10,000 metrics, 300 logs and 1,000 spans; logs page further. RED curves and API/log/error/AI/SLO summaries scan the full retained scope in SQL, with at most 1,000 result groups and explicit truncation. Observed spans are not a proven whole-traffic denominator. Host and individual AI charts remain bounded samples.
 - Rules default to independent resource groups. Region/service aggregation sums request rates, uses request-weighted error rates and the maximum instance p95. This maximum is **not** a global population p95. Samples older than two minutes are no-data; exceeding evaluation bounds fails explicitly. Rules are not PromQL.
@@ -206,7 +222,7 @@ The [2026-10-10 Daangn and Toss research](docs/DAANGN_TOSS_RESEARCH.md) reviews 
 
 ## Documentation
 
-[v0.3 redesign](docs/REDESIGN.md) · [Product and UX](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [Multi-region](docs/MULTI_REGION.md) · [API](docs/API.md) · [Operations](docs/OPERATIONS.md) · [Research](docs/RESEARCH.md) · [OSS comparison review](docs/OSS_COMPARISON_REVIEW.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+[v0.3 redesign](docs/REDESIGN.md) · [Product and UX](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) · [Multi-region](docs/MULTI_REGION.md) · [API](docs/API.md) · [Operations](docs/OPERATIONS.md) · [Request-flow research](docs/REQUEST_FLOW_REDESIGN.md) · [Research](docs/RESEARCH.md) · [OSS comparison review](docs/OSS_COMPARISON_REVIEW.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 ## License
 

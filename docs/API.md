@@ -208,3 +208,41 @@ Diagnosis returns `mode`, version, authorized evidence, hypotheses with supporti
 Logs map resourceLogs/scopeLogs/logRecords, scalar body/severity/timestamps and trace IDs. Metrics map gauge/sum/explicit-bucket histogram; preserve name/unit/start/temporality/distribution. Nonmonotonic sums are represented as signed gauges, monotonic sums as counters. Exponential histograms, protobuf/gRPC and arbitrary point-label series aggregation are unsupported. JSON parser/key/batch/expanded body/resource limits apply to all signals.
 
 Probes may set `vantageRegion`; only a worker with that REGION executes them. Result metadata records `lastVantageRegion` and `lastWorkerId`. Target resource region and executing vantage are separate. There is no automatic substitute region when the selected worker region is unavailable.
+
+## Request flow (v0.4)
+
+`GET /api/request-flow?workspace=live&from=<unix-ms>&to=<unix-ms>` accepts the shared environment/service/resource selectors and optional `route`. Optional `edge` is a 24-character lowercase hexadecimal connection ID returned by a previous response. Bad syntax returns 400; an ID outside the current scope returns 404 with a clear-selection message. Read access is required; workspace authorization is unchanged.
+
+Response `source` is always `retained-observed-spans`. `nodes` carry type (`caller`, `workload`, `dependency`), service/host name, environment, region, module and catalog owner. `edges` carry source/target IDs, method/route/protocol/direction, count/errors/clientErrors/throttled/timeouts/retries/paired, parentRequests/impactedRequests/recoveredRequests and observed average/p50/p95/maximum latency in milliseconds. `firstSeen`/`lastSeen` and response `from`/`to` are Unix milliseconds.
+
+CLIENT→SERVER pairs count one attempt, measured at CLIENT. Unpaired SERVER spans describe entry requests. `parentRequests` counts distinct nearest ancestor SERVER requests; `impactedRequests` counts those with a failed child and failed SERVER; `recoveredRequests` counts those with a failed child and successful SERVER. These are correlated outcomes and are not a root-cause or business-success claim. Retries counts attempts whose resend ordinal is greater than zero; malformed resend values contribute zero.
+
+`selectedEdge` defaults to a high-failure outbound connection. `buckets` contain its time-series counts/errors/observed p95. `histogram` contains sparse `{timestamp, bin, count}` rows with non-overlapping bins: ≤10ms, (10,25], (25,50], (50,100], (100,250], (250,500], (500,1000], (1000,2500], (2500,5000], (5000,10000], >10000ms. Empty cells are absent. `durationBounds` exposes the boundaries; `stepMs` is at least one minute and targets at most 48 buckets. `evidence` contains at most 12 failed/slow attempts with trace/span IDs and optional parent response facts. Up to 1,000 connections are returned; `truncated` discloses result caps. The frontend graph has its own 50-node/60-pair cap.
+
+Native spans may specify `spanKind` (`internal`, `server`, `client`, `producer`, `consumer`). OTLP JSON uses numeric kinds 0–5; absent/unspecified kind stays unknown and is not fabricated as SERVER. Existing legacy root spans remain eligible for older API/SLI views; explicit CLIENT roots do not enter their server-request denominator.
+
+### Dependency monitors
+
+`GET /api/dependency-monitors?workspace=live` returns `{items, statuses, observedAt}` (server observation time). Each evaluation status carries `at`, configuration `revision`, `status` (`unknown`, `healthy`, `violated`) and per-connection observations. A missing or mismatched-revision evaluation means pending; an old timestamp means stale. Status is current control evidence, independent of the historical investigation window.
+
+Write access supports `POST /api/dependency-monitors` and `PATCH /api/dependency-monitors/:id`. PATCH uses a full definition, matching other control APIs. Body:
+
+```json
+{
+  "name": "Orders → payment provider",
+  "service": "orders-api",
+  "environment": "production",
+  "region": "ap-northeast-2",
+  "module": "api",
+  "dependency": "payment-provider",
+  "route": "/charge",
+  "method": "POST",
+  "indicator": "error_pct",
+  "threshold": 5,
+  "minimumRequests": 20,
+  "windowMinutes": 5,
+  "enabled": true
+}
+```
+
+`indicator` is `error_pct` or `p95_ms`. Threshold must be positive; percentage ≤100, latency ≤86,400,000ms. Minimum count is 1–1,000,000; window is 1–1,440 minutes. At most 50 monitors per workspace. Optional deployment selectors scope the source. Rules match outgoing source/target/route/method, evaluate each region/module connection and use a revision check within a short control transaction. Multiple workers take a per-monitor database lock. Missing/insufficient observations hold an existing active alert rather than announcing recovery. Healthy observations resolve it; disabling resolves active monitor alerts through the recovery pipeline. Notification policies, maintenance, acknowledgment, snooze and repeats use existing delivery semantics. Demo rules do not cause external network delivery. These rules observe retained attempts; they are not unsampled service-level objectives.

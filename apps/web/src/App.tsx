@@ -2,7 +2,6 @@ import {
   Catalog,
   ServiceLevels,
   NotificationPolicies,
-  Relationships,
   OperationalAnalysis,
   AIOperations,
   APIAnalysis,
@@ -59,6 +58,8 @@ import { Dialog, Empty } from './components';
 import { CreateForm } from './Forms';
 import { Detail } from './Detail';
 import { request, queryString } from './api';
+import { RequestFlow } from './flow/RequestFlow';
+import './flow/style.css';
 const navigation = [
   {
     key: 'platform',
@@ -85,17 +86,17 @@ const navigation = [
     description: '담당 팀별 라우팅과 유지보수 시간을 관리합니다.',
   },
   {
-    key: 'relations',
-    name: '서비스 관계',
-    icon: GitBranch,
-    description: '메시징과 데이터베이스까지 관측 근거로 탐색합니다.',
+    key: 'metrics',
+    name: '운영 지표',
+    icon: ChartNoAxesCombined,
+    description: '서비스와 인프라의 운영 지표를 확인합니다.',
   },
 
   {
     key: 'overview',
-    name: '대시보드',
+    name: '요청 흐름',
     icon: LayoutDashboard,
-    description: '운영 흐름을 한눈에 확인합니다.',
+    description: '호출자에서 우리 API와 외부 의존성까지 조사합니다.',
   },
   {
     key: 'services',
@@ -172,7 +173,7 @@ const navigation = [
       'slos',
       'policies',
       'analytics',
-      'relations',
+      'metrics',
       'ai',
       'platform',
       'connections',
@@ -190,7 +191,7 @@ const navigation = [
       'slos',
       'policies',
       'analytics',
-      'relations',
+      'metrics',
       'ai',
       'platform',
       'connections',
@@ -213,7 +214,8 @@ function AIWorkspace(p: PageProps) {
   );
 }
 const pages: Record<string, (p: PageProps) => React.ReactNode> = {
-  overview: Overview,
+  overview: RequestFlow,
+  metrics: Overview,
   deployments: Deployments,
   services: (p) => (
     <>
@@ -231,7 +233,7 @@ const pages: Record<string, (p: PageProps) => React.ReactNode> = {
   platform: PlatformHealth,
   slos: ServiceLevels,
   policies: NotificationPolicies,
-  relations: Relationships,
+  relations: RequestFlow,
   ai: AIWorkspace,
   connections: ConnectionsPage,
 };
@@ -281,6 +283,8 @@ export default function App() {
   const params = useMemo(
     () => ({
       workspace,
+      edge: url.get('edge') || undefined,
+      flowView: url.get('flowView') || undefined,
       route: url.get('route') || undefined,
       ...Object.fromEntries(dimensionKeys.map((key) => [key, url.get(key) || undefined])),
       environment: env || undefined,
@@ -328,7 +332,8 @@ export default function App() {
       ),
     retry: false,
   });
-  const current = navigation.find((n) => n.key === page)!,
+  const current = (navigation.find((n) => n.key === page) ??
+      navigation.find((n) => n.key === 'overview'))!,
     PageComponent = pages[page];
   const update = useCallback((patch: Record<string, string | undefined>, replace = false) => {
     const next = new URLSearchParams(location.search);
@@ -342,6 +347,7 @@ export default function App() {
       next.delete('detailId');
       setSelection(null);
       if (!Object.hasOwn(patch, 'route')) next.delete('route');
+      if (!Object.hasOwn(patch, 'edge')) next.delete('edge');
     }
     for (const [key, value] of Object.entries(patch)) {
       if (value === undefined || value === '') next.delete(key);
@@ -396,6 +402,7 @@ export default function App() {
       search: undefined,
       level: undefined,
       route: undefined,
+      edge: undefined,
       ...(s !== undefined ? { service: s } : {}),
     });
     setSelection(null);
@@ -590,7 +597,7 @@ export default function App() {
           <div>
             <span className="operator-avatar">OP</span>
             <span>
-              Operations workspace<small>v0.3.0</small>
+              Operations workspace<small>v0.4.0</small>
             </span>
           </div>
         </div>

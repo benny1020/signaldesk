@@ -1,4 +1,5 @@
 import type { Storage } from './storage.ts';
+import { seedRequestFlowDemo } from './flow-demo.ts';
 import { resourceKey } from '../../../packages/contracts/src/index.ts';
 import type {
   TelemetryEvent,
@@ -10,6 +11,7 @@ export async function seedDemo(store: Storage, now = Date.now()) {
   const existingNow = await store.setting('demoNow');
   if (existingNow) {
     await seedOperationalDemo(store, Number(existingNow));
+    await seedRequestFlowDemo(store, Number(existingNow));
     return;
   }
   const services = [
@@ -296,6 +298,7 @@ export async function seedDemo(store: Storage, now = Date.now()) {
   await store.setSetting('demoNow', String(now));
   await store.setSetting('demoRevision', '3');
   await seedOperationalDemo(store, now);
+  await seedRequestFlowDemo(store, now);
 }
 
 async function seedOperationalDemo(store: Storage, now: number) {

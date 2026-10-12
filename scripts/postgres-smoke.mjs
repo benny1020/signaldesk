@@ -368,6 +368,10 @@ try {
                   startTimeUnixNano: String(BigInt(traceTime) * 1000000n),
                   endTimeUnixNano: String(BigInt(traceTime + 12) * 1000000n),
                   status: { code: 1 },
+                  attributes: [
+                    { key: 'url.query', value: { stringValue: 'fixture-private-query-marker' } },
+                    { key: 'http.route', value: { stringValue: '/queued' } },
+                  ],
                 },
               ],
             },
@@ -389,6 +393,26 @@ try {
       (await request(apiB, '/api/traces/' + traceId + '?workspace=live')).items.length,
       0,
     );
+    const queuePrivacy = JSON.parse(
+      await docker(
+        'run',
+        '--rm',
+        '--user',
+        '0:0',
+        '-v',
+        queueVolume + ':/queue:ro',
+        image,
+        'node',
+        '-e',
+        `const fs=require('fs');const files=[];function read(p){for(const e of fs.readdirSync(p,{withFileTypes:true})){const f=p+'/'+e.name;if(e.isDirectory())read(f);else files.push(fs.readFileSync(f));}}read('/queue');console.log(JSON.stringify({queued:files.some(b=>b.includes(Buffer.from('queued regional request'))),privateQuery:files.some(b=>b.includes(Buffer.from('fixture-private-query-marker')))}));`,
+      ),
+    );
+    assert.equal(queuePrivacy.queued, true, 'Expected a trace in the actual Collector disk queue');
+    assert.equal(
+      queuePrivacy.privateQuery,
+      false,
+      'Sensitive query must be removed before Collector persistence',
+    );
     await docker('restart', collector);
     await docker('start', prefix + '-api-a');
     apiA = await base(prefix + '-api-a');
@@ -404,6 +428,7 @@ try {
         multiProcess: 'passed',
         collectorJsonInteroperability: true,
         regionalTraceQueueSurvivedRestart: true,
+        collectorQueuePrivacy: true,
         apiReplicas: 2,
         workers: 2,
         regions: 2,
@@ -422,7 +447,9 @@ try {
   }
 } catch (error) {
   // Only diagnostic fixture logs are collected. Never print generated tokens or connection strings.
-  const redacted = String(error.stderr ?? error.stdout ?? error.stack ?? error)
+  const redacted = (
+    [error.stderr, error.stdout, error.stack].filter(Boolean).join('\n') || String(error)
+  )
     .replaceAll(password, '[redacted]')
     .replaceAll(admin, '[redacted]')
     .replaceAll(channelKey, '[redacted]');

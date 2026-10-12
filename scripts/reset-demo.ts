@@ -7,7 +7,7 @@ store.transaction(() => {
   store.db.prepare("DELETE FROM telemetry WHERE workspace='demo'").run();
   store.db.prepare("DELETE FROM entities WHERE workspace='demo'").run();
   store.db.prepare("DELETE FROM audit WHERE workspace='demo'").run();
-  store.db.prepare("DELETE FROM settings WHERE key='demoNow'").run();
+  store.db.prepare("DELETE FROM settings WHERE key IN ('demoNow','request-flow-demo-v1')").run();
 });
 await seedDemo(store);
 store.close();

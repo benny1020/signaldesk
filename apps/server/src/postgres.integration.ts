@@ -4,6 +4,9 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { PostgresStore } from './postgres.ts';
 import { Engine } from './engine.ts';
 import { createApp } from './app.ts';
+import { Store } from './store.ts';
+import { requestFlow } from './flow.ts';
+import { evaluateDependencies } from './dependency-monitor.ts';
 import type { Metric, Rule } from '../../../packages/contracts/src/index.ts';
 const url = process.env.TEST_DATABASE_URL;
 if (!url || !new URL(url).pathname.endsWith('_test'))
@@ -291,6 +294,120 @@ test('real PostgreSQL storage, concurrency and loss-of-lock acceptance', async (
         const receipts = (await a.deliveries('live')).filter((d) => d.alert_id === alert.id);
         assert.equal(receipts.length, 2);
         assert.deepEqual(receipts.map((d) => d.event_type).sort(), ['firing', 'recovery']);
+      },
+    );
+    await t.test(
+      'request-flow SQL parity, pairing, nested customer outcomes and dependency locks across pools',
+      async () => {
+        const memory = new Store(':memory:'),
+          source = 'flow-source-' + randomUUID(),
+          target = 'flow-target-' + randomUUID();
+        const base = {
+          kind: 'span' as const,
+          timestamp: now - 2000,
+          service: source,
+          environment: 'test',
+          region: 'seoul',
+          module: 'edge',
+          instanceId: 'flow-1',
+          name: 'POST /orders',
+          durationMs: 300,
+          status: 'ok' as const,
+          attributes: {},
+        };
+        const fixture = [
+          {
+            ...base,
+            id: 'flow-root',
+            traceId: 'flow-correlated',
+            spanId: 'root',
+            spanKind: 'server' as const,
+          },
+          {
+            ...base,
+            id: 'flow-call',
+            traceId: 'flow-correlated',
+            spanId: 'call',
+            spanKind: 'client' as const,
+            parentSpanId: 'root',
+          },
+          {
+            ...base,
+            id: 'flow-target',
+            traceId: 'flow-correlated',
+            spanId: 'target',
+            spanKind: 'server' as const,
+            parentSpanId: 'call',
+            service: target,
+            region: 'virginia',
+          },
+          ...Array.from({ length: 1101 }, (_, i) => ({
+            ...base,
+            id: 'flow-provider-' + i,
+            traceId: 'flow-correlated',
+            spanId: 'provider-' + i,
+            spanKind: 'client' as const,
+            parentSpanId: 'target',
+            service: target,
+            region: 'virginia',
+            durationMs: i + 1,
+            status: i < 100 ? ('error' as const) : ('ok' as const),
+            attributes: {
+              'server.address': 'provider.test',
+              'url.template': '/pay',
+              'http.request.method': 'POST',
+              'http.request.resend_count': i === 1100 ? 'malformed' : i % 2,
+            },
+          })),
+        ];
+        try {
+          await a.append('live', fixture);
+          memory.append('live', fixture);
+          const q = {
+              workspace: 'live' as const,
+              service: target,
+              environment: 'test',
+              from: now - 60000,
+              to: now + 1000,
+            },
+            pg = await requestFlow(b, b, q),
+            local = await requestFlow(memory, memory, q);
+          const canonical = (d: typeof pg) => ({
+            ...d,
+            nodes: d.nodes.sort((x, y) => x.id.localeCompare(y.id)),
+            edges: d.edges.sort((x, y) => x.id.localeCompare(y.id)),
+          });
+          assert.deepEqual(canonical(pg), canonical(local));
+          assert.equal(pg.edges.find((e) => e.paired)?.count, 1);
+          assert.equal(pg.edges.find((e) => e.count === 1101)?.recoveredRequests, 1);
+          assert.equal(pg.edges.find((e) => e.count === 1101)?.p95Ms, 1046);
+          const monitor = {
+            id: 'pg-dependency',
+            workspace: 'live' as const,
+            name: 'test',
+            service: target,
+            environment: 'test',
+            dependency: 'provider.test',
+            route: '/pay',
+            method: 'POST',
+            indicator: 'error_pct' as const,
+            threshold: 5,
+            minimumRequests: 20,
+            windowMinutes: 1,
+            enabled: true,
+            createdAt: now,
+            updatedAt: now,
+            revision: 1,
+          };
+          await a.put('dependency-monitor', monitor);
+          await Promise.all([
+            evaluateDependencies(a, a, 'live', now),
+            evaluateDependencies(b, b, 'live', now),
+          ]);
+          assert.equal((await b.alerts('live', 'dependency:' + monitor.id)).length, 1);
+        } finally {
+          memory.close();
+        }
       },
     );
   } finally {

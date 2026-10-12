@@ -1,4 +1,5 @@
 import { notificationPlan, evaluateSLO } from './operations.ts';
+import { evaluateDependencies } from './dependency-monitor.ts';
 import type { SLO } from '../../../packages/contracts/src/index.ts';
 import { randomUUID, createHash } from 'node:crypto';
 import {
@@ -518,6 +519,7 @@ export class Engine {
       await this.probes(now);
       await this.evaluate('live', now);
       await this.evaluateSLOs('live', now);
+      await evaluateDependencies(this.store, this.telemetry, 'live', now);
       await this.deliver(now);
       this.heartbeat = Date.now();
       this.lastError = null;
